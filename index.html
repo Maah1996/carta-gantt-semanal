@@ -216,8 +216,8 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 }
 .barra .relleno{position:absolute;left:0;top:0;bottom:0}
 .barra .etq{
-  position:relative;z-index:1;color:#fff;font-size:10.5px;padding:0 6px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  position:relative;z-index:1;color:#fff;font-size:10.5px;padding:0 2px;
+  white-space:nowrap;overflow:hidden;text-align:center;font-weight:bold;
   text-shadow:0 1px 2px rgba(0,0,0,.55);width:100%;
 }
 
@@ -847,9 +847,9 @@ function renderGantt(){
       '</div>'+
       '<div class="tl">'+
         (idxHoy>=0 ? '<div class="marca-hoy" style="left:calc(100%/60*'+idxHoy+');width:calc(100%/60)"></div>' : '')+
-        '<div class="barra" style="left:calc(100%/60*'+t.i0+');width:calc(100%/60*'+(t.i1-t.i0+1)+');background:'+hexA(col,.40)+'">'+
+        '<div class="barra" title="'+esc(a.nombre)+' — '+av+'%" style="left:calc(100%/60*'+t.i0+');width:calc(100%/60*'+(t.i1-t.i0+1)+');background:'+hexA(col,.40)+'">'+
           '<div class="relleno" style="width:'+av+'%;background:'+col+'"></div>'+
-          '<div class="etq">'+esc(a.nombre)+' · '+av+'%</div>'+
+          '<div class="etq">'+av+'%</div>'+
         '</div>'+
       '</div></div>';
   }
