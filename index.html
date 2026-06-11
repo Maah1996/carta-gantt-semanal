@@ -604,8 +604,10 @@ function alertaDe(a){
 const TXT_ALERTA = { vencida:"Vencida", porvencer:"Por vencer", aldia:"Al día" };
 
 /* % de avance vigente de una actividad.
-   - Finalizada → 100.
-   - Modo "auto": avanza solo con los días transcurridos entre inicio y término.
+   - Finalizada → 100 (el 100% queda reservado para actividades terminadas).
+   - Modo "auto": avanza solo con los días transcurridos entre inicio y término,
+     con tope de 99% — aunque el plazo se haya consumido, no llega a 100%
+     hasta que el usuario la marque como Finalizada.
    - Modo "manual": valor fijado por el usuario (p. ej. actividad detenida). */
 function avanceDe(a){
   if(a.estado==="Finalizada") return 100;
@@ -614,7 +616,7 @@ function avanceDe(a){
   if(hoy < ini) return 0;
   const total = (fin-ini)/86400000 + 1;
   const trans = (hoy-ini)/86400000 + 1;
-  return Math.min(100, Math.max(0, Math.round(trans/total*100)));
+  return Math.min(99, Math.max(0, Math.round(trans/total*100)));
 }
 
 /* ============================================================
