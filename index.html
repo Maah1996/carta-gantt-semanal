@@ -1249,14 +1249,14 @@ function abrirKpi(clave){
   document.getElementById("kpiSub").textContent =
     (config.unidad||"")+" · Año "+config.anio+" · generado el "+fmtFecha(new Date().toISOString().slice(0,10));
 
+  const ORDEN   = ["En Ejecución","Pendiente","Finalizada","Suspendida"];
+  const TITULOS = { "En Ejecución":"EN EJECUCIÓN", "Pendiente":"PENDIENTES",
+                    "Finalizada":"FINALIZADAS",    "Suspendida":"SUSPENDIDAS" };
   let html;
   if(!lista.length){
     html = '<div class="sin-act">Sin actividades en esta categoría.</div>';
   }else if(d.porSecciones){
     /* Total Actividades: agrupado por secciones según estado */
-    const ORDEN   = ["En Ejecución","Pendiente","Finalizada","Suspendida"];
-    const TITULOS = { "En Ejecución":"EN EJECUCIÓN", "Pendiente":"PENDIENTES",
-                      "Finalizada":"FINALIZADAS",    "Suspendida":"SUSPENDIDAS" };
     html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th>Fecha Inicio</th><th>Fecha Término</th></tr></thead><tbody>';
     for(const est of ORDEN){
       const grupo = lista.filter(a=>a.estado===est);
@@ -1270,10 +1270,19 @@ function abrirKpi(clave){
     }
     html += '</tbody></table>';
   }else if(d.soloAvance){
-    /* Tarjeta % Avance: solo nombre de la tarea y su porcentaje actual */
-    html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th style="text-align:right">% Avance</th></tr></thead><tbody>'+
-      lista.map(a=>'<tr><td>'+esc(a.nombre)+'</td><td class="der">'+avanceDe(a)+'%'+(a.modoAvance==="auto"?" (auto)":"")+'</td></tr>').join("")+
-      '</tbody></table>';
+    /* Tarjeta % Avance: nombre y porcentaje actual, agrupado por secciones según estado */
+    html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th style="text-align:right">% Avance</th></tr></thead><tbody>';
+    for(const est of ORDEN){
+      const grupo = lista.filter(a=>a.estado===est);
+      html += '<tr class="sec"><td colspan="2">'+TITULOS[est]+' ('+grupo.length+')</td></tr>';
+      if(!grupo.length){
+        html += '<tr class="vacia"><td colspan="2">Sin actividades</td></tr>';
+      }else{
+        html += grupo.map(a=>'<tr><td>'+esc(a.nombre)+'</td><td class="der">'+avanceDe(a)+'%'+
+          (a.modoAvance==="auto"?" (auto)":"")+'</td></tr>').join("");
+      }
+    }
+    html += '</tbody></table>';
   }else{
     /* Resto de tarjetas: nombre, fecha inicio y fecha término */
     html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th>Fecha Inicio</th><th>Fecha Término</th></tr></thead><tbody>'+
