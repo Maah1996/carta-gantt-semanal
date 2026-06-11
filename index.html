@@ -344,6 +344,13 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 }
 .kpi-tabla td{padding:6px 10px;border-bottom:1px solid var(--borde)}
 .kpi-tabla .der{text-align:right;font-weight:bold;white-space:nowrap}
+.kpi-tabla tr.sec td{
+  background:rgba(30,58,95,.10);color:var(--azul);font-weight:bold;
+  text-transform:uppercase;letter-spacing:.06em;font-size:11px;
+  padding:7px 10px;border-top:2px solid var(--azul);
+}
+[data-theme="oscuro"] .kpi-tabla tr.sec td{color:#9db8d8;border-top-color:#9db8d8}
+.kpi-tabla tr.vacia td{color:var(--texto-suave);font-style:italic;font-size:12px}
 
 /* ============================================================
    RESPONSIVE
@@ -1227,7 +1234,7 @@ function cerrarModalConfig(){ document.getElementById("modalCfg").classList.remo
    ============================================================ */
 function abrirKpi(clave){
   const defs = {
-    total:      { t:"Total Actividades",      f:a=>true },
+    total:      { t:"Total Actividades",      f:a=>true, porSecciones:true },
     pendientes: { t:"Actividades Pendientes", f:a=>a.estado==="Pendiente" },
     ejecucion:  { t:"En Ejecución",           f:a=>a.estado==="En Ejecución" },
     finalizadas:{ t:"Finalizadas",            f:a=>a.estado==="Finalizada" },
@@ -1245,6 +1252,23 @@ function abrirKpi(clave){
   let html;
   if(!lista.length){
     html = '<div class="sin-act">Sin actividades en esta categoría.</div>';
+  }else if(d.porSecciones){
+    /* Total Actividades: agrupado por secciones según estado */
+    const ORDEN   = ["En Ejecución","Pendiente","Finalizada","Suspendida"];
+    const TITULOS = { "En Ejecución":"EN EJECUCIÓN", "Pendiente":"PENDIENTES",
+                      "Finalizada":"FINALIZADAS",    "Suspendida":"SUSPENDIDAS" };
+    html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th>Fecha Inicio</th><th>Fecha Término</th></tr></thead><tbody>';
+    for(const est of ORDEN){
+      const grupo = lista.filter(a=>a.estado===est);
+      html += '<tr class="sec"><td colspan="3">'+TITULOS[est]+' ('+grupo.length+')</td></tr>';
+      if(!grupo.length){
+        html += '<tr class="vacia"><td colspan="3">Sin actividades</td></tr>';
+      }else{
+        html += grupo.map(a=>'<tr><td>'+esc(a.nombre)+'</td><td>'+fmtFecha(a.fechaInicio)+'</td><td>'+
+          (a.fechaTermino?fmtFecha(a.fechaTermino):"—")+'</td></tr>').join("");
+      }
+    }
+    html += '</tbody></table>';
   }else if(d.soloAvance){
     /* Tarjeta % Avance: solo nombre de la tarea y su porcentaje actual */
     html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th style="text-align:right">% Avance</th></tr></thead><tbody>'+
