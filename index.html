@@ -211,10 +211,20 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 }
 .marca-hoy{position:absolute;top:0;bottom:0;background:var(--hoy);border-left:2px solid var(--vencida);pointer-events:none}
 .barra{
-  position:absolute;top:5px;bottom:5px;border-radius:3px;overflow:hidden;
+  position:absolute;top:5px;bottom:5px;border-radius:3px;
   display:flex;align-items:center;
 }
-.barra .relleno{position:absolute;left:0;top:0;bottom:0}
+.barra .relleno{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+/* Letrero con el nombre de la actividad al pasar el mouse sobre la barra */
+.barra::after{
+  content:attr(data-nombre);position:absolute;left:calc(100% + 6px);top:50%;
+  transform:translateY(-50%);background:var(--azul);color:#fff;
+  padding:3px 10px;border-radius:4px;font-size:11.5px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .1s;z-index:30;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.barra:hover::after{opacity:1}
+.barra.tt-izq::after{left:auto;right:calc(100% + 6px)}
 .barra .etq{
   position:relative;z-index:1;color:#fff;font-size:10.5px;padding:0 2px;
   white-space:nowrap;overflow:hidden;text-align:center;font-weight:bold;
@@ -712,6 +722,22 @@ function actsFiltradas(){
    ============================================================ */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function colorDe(a){ return a.estado==="Finalizada" ? COLOR_FINALIZADA : (CATEGORIAS[a.categoria]||"#64748b"); }
+
+/* Color de la barra según el % de avance (semáforo ejecutivo) */
+const RANGOS_AVANCE = [
+  ["0–30%",  "#a83232"],   // rojo
+  ["31–50%", "#c9a227"],   // amarillo
+  ["51–75%", "#c96a15"],   // naranja
+  ["76–99%", "#6aa84f"],   // verde claro
+  ["100%",   "#6f9fc8"]    // azul claro
+];
+function colorAvance(p){
+  if(p>=100) return "#6f9fc8";
+  if(p>=76)  return "#6aa84f";
+  if(p>=51)  return "#c96a15";
+  if(p>=31)  return "#c9a227";
+  return "#a83232";
+}
 function hexA(hex,al){
   const n=parseInt(hex.slice(1),16);
   return "rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+al+")";
@@ -847,8 +873,8 @@ function renderGantt(){
       '</div>'+
       '<div class="tl">'+
         (idxHoy>=0 ? '<div class="marca-hoy" style="left:calc(100%/60*'+idxHoy+');width:calc(100%/60)"></div>' : '')+
-        '<div class="barra" title="'+esc(a.nombre)+' — '+av+'%" style="left:calc(100%/60*'+t.i0+');width:calc(100%/60*'+(t.i1-t.i0+1)+');background:'+hexA(col,.40)+'">'+
-          '<div class="relleno" style="width:'+av+'%;background:'+col+'"></div>'+
+        '<div class="barra'+(t.i1>53?" tt-izq":"")+'" data-nombre="'+esc(a.nombre)+' — '+av+'%" style="left:calc(100%/60*'+t.i0+');width:calc(100%/60*'+(t.i1-t.i0+1)+');background:'+hexA(colorAvance(av),.35)+'">'+
+          '<div class="relleno" style="width:'+av+'%;background:'+colorAvance(av)+'"></div>'+
           '<div class="etq">'+av+'%</div>'+
         '</div>'+
       '</div></div>';
@@ -1257,8 +1283,11 @@ function imprimirKpi(){
     '<option value="auto">Automático (avanza según fechas)</option>'+
     [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'">'+v+'% (manual)</option>').join("");
   document.getElementById("leyenda").innerHTML =
-    Object.entries(CATEGORIAS).map(([c,col])=>'<div><span class="cuadro" style="background:'+col+'"></span>'+c+'</div>').join("")+
-    '<div><span class="cuadro" style="background:'+COLOR_FINALIZADA+'"></span>Finalizada (cualquier categoría)</div>';
+    '<div><b>AVANCE:</b></div>'+
+    RANGOS_AVANCE.map(([r,col])=>'<div><span class="cuadro" style="background:'+col+'"></span>'+r+'</div>').join("")+
+    '<div style="border-left:1px solid var(--borde);align-self:stretch"></div>'+
+    '<div><b>CATEGORÍAS:</b></div>'+
+    Object.entries(CATEGORIAS).map(([c,col])=>'<div><span class="cuadro" style="background:'+col+'"></span>'+c+'</div>').join("");
 
   cargar();
 
