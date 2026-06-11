@@ -101,7 +101,9 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 .kpi{
   background:var(--panel);border:1px solid var(--borde);border-radius:5px;
   box-shadow:var(--sombra);padding:9px 12px;border-top:3px solid var(--azul);
+  cursor:pointer;transition:transform .08s;
 }
+.kpi:hover{transform:translateY(-2px);border-color:var(--azul)}
 .kpi .num{font-size:23px;font-weight:bold;line-height:1.1}
 .kpi .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--texto-suave)}
 .kpi.k-atrasadas{border-top-color:var(--vencida)}
@@ -323,6 +325,16 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 }
 .m-pie .btn{padding:9px 24px;font-size:14px}
 
+/* Detalle de indicador KPI */
+.kpi-sub{font-size:11.5px;color:var(--texto-suave);margin:-8px 0 12px}
+.kpi-tabla{width:100%;border-collapse:collapse;font-size:13px}
+.kpi-tabla th{
+  background:var(--azul);color:#fff;text-align:left;padding:6px 10px;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+}
+.kpi-tabla td{padding:6px 10px;border-bottom:1px solid var(--borde)}
+.kpi-tabla .der{text-align:right;font-weight:bold;white-space:nowrap}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -344,6 +356,11 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
   .card,.kpi,.grafico-card,.bloque-cuerpo{box-shadow:none}
   .app-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Impresión del detalle KPI: solo la lista de la ventana */
+  body.print-kpi .app-header,body.print-kpi .kpis,body.print-kpi .layout{display:none!important}
+  body.print-kpi #modalKpi{display:block!important;position:static;padding:0;background:#fff;overflow:visible}
+  body.print-kpi #modalKpi .modal{box-shadow:none;border:none;max-width:100%;padding:0}
+  body.print-kpi #modalKpi .m-pie{display:none!important}
 }
 </style>
 </head>
@@ -474,6 +491,19 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
   </div>
 </div>
 
+<!-- ============ MODAL: DETALLE DE INDICADOR KPI ============ -->
+<div class="modal-fondo" id="modalKpi" onclick="if(event.target===this)cerrarModalKpi()">
+  <div class="modal" style="max-width:680px">
+    <h3 id="kpiTitulo">Detalle</h3>
+    <div class="kpi-sub" id="kpiSub"></div>
+    <div id="kpiCuerpo"></div>
+    <div class="m-pie">
+      <button class="btn sec" type="button" onclick="cerrarModalKpi()">Cerrar</button>
+      <button class="btn" type="button" onclick="imprimirKpi()">Imprimir</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 /* ============================================================
@@ -520,6 +550,7 @@ function idxSemana(m,s){ return (m-1)*5 + (s-1); }          // índice 0..59 den
 function hoyCero(){ const h=new Date(); h.setHours(0,0,0,0); return h; }
 function aDate(s){ const f=pf(s); return new Date(f.y,f.m-1,f.d); }
 function fmtCorta(s){ const f=pf(s); return String(f.d).padStart(2,"0")+"/"+String(f.m).padStart(2,"0"); }
+function fmtFecha(s){ const f=pf(s); return String(f.d).padStart(2,"0")+"/"+String(f.m).padStart(2,"0")+"/"+f.y; }
 function fmtLarga(s){ const f=pf(s); const dt=aDate(s); return DIAS[dt.getDay()]+" "+f.d+" de "+MESES_M[f.m-1]+" de "+f.y; }
 function etiquetaSemana(s){ const f=pf(s); return MESES[f.m-1].slice(0,3)+" · S"+semanaDeDia(f.d); }
 
@@ -713,16 +744,17 @@ function renderKPIs(){
   const prox = L.filter(a=>alertaDe(a)==="porvencer").length;
   const avg  = L.length ? Math.round(L.reduce((s,a)=>s+avanceDe(a),0)/L.length) : 0;
   const tarjetas = [
-    ["Total Actividades", L.length, ""],
-    ["Pendientes",        cnt("Pendiente"), ""],
-    ["En Ejecución",      cnt("En Ejecución"), ""],
-    ["Finalizadas",       cnt("Finalizada"), "k-finalizadas"],
-    ["Atrasadas",         venc, "k-atrasadas"],
-    ["Próximas a vencer", prox, "k-porvencer"],
-    ["% Avance General",  avg+"%", ""]
+    ["Total Actividades", L.length, "", "total"],
+    ["Pendientes",        cnt("Pendiente"), "", "pendientes"],
+    ["En Ejecución",      cnt("En Ejecución"), "", "ejecucion"],
+    ["Finalizadas",       cnt("Finalizada"), "k-finalizadas", "finalizadas"],
+    ["Atrasadas",         venc, "k-atrasadas", "atrasadas"],
+    ["Próximas a vencer", prox, "k-porvencer", "porvencer"],
+    ["% Avance General",  avg+"%", "", "avance"]
   ];
   document.getElementById("kpis").innerHTML = tarjetas.map(t=>
-    '<div class="kpi '+t[2]+'"><div class="num">'+t[1]+'</div><div class="lbl">'+t[0]+'</div></div>').join("");
+    '<div class="kpi '+t[2]+'" onclick="abrirKpi(\''+t[3]+'\')" title="Clic para ver el detalle">'+
+    '<div class="num">'+t[1]+'</div><div class="lbl">'+t[0]+'</div></div>').join("");
 }
 
 /* ——— Opciones dinámicas de filtros ——— */
@@ -1165,6 +1197,51 @@ function abrirModalConfig(){
 function cerrarModalConfig(){ document.getElementById("modalCfg").classList.remove("on"); }
 
 /* ============================================================
+   DETALLE DE INDICADORES KPI (clic en las tarjetas)
+   ============================================================ */
+function abrirKpi(clave){
+  const defs = {
+    total:      { t:"Total Actividades",      f:a=>true },
+    pendientes: { t:"Actividades Pendientes", f:a=>a.estado==="Pendiente" },
+    ejecucion:  { t:"En Ejecución",           f:a=>a.estado==="En Ejecución" },
+    finalizadas:{ t:"Finalizadas",            f:a=>a.estado==="Finalizada" },
+    atrasadas:  { t:"Actividades Atrasadas",  f:a=>alertaDe(a)==="vencida" },
+    porvencer:  { t:"Próximas a Vencer",      f:a=>alertaDe(a)==="porvencer" },
+    avance:     { t:"Avance por Actividad",   f:a=>true, soloAvance:true }
+  };
+  const d = defs[clave]; if(!d) return;
+  const lista = actsAnio().filter(d.f).sort((a,b)=>a.fechaInicio.localeCompare(b.fechaInicio));
+
+  document.getElementById("kpiTitulo").textContent = d.t.toUpperCase()+" ("+lista.length+")";
+  document.getElementById("kpiSub").textContent =
+    (config.unidad||"")+" · Año "+config.anio+" · generado el "+fmtFecha(new Date().toISOString().slice(0,10));
+
+  let html;
+  if(!lista.length){
+    html = '<div class="sin-act">Sin actividades en esta categoría.</div>';
+  }else if(d.soloAvance){
+    /* Tarjeta % Avance: solo nombre de la tarea y su porcentaje actual */
+    html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th style="text-align:right">% Avance</th></tr></thead><tbody>'+
+      lista.map(a=>'<tr><td>'+esc(a.nombre)+'</td><td class="der">'+avanceDe(a)+'%'+(a.modoAvance==="auto"?" (auto)":"")+'</td></tr>').join("")+
+      '</tbody></table>';
+  }else{
+    /* Resto de tarjetas: nombre, fecha inicio y fecha término */
+    html = '<table class="kpi-tabla"><thead><tr><th>Actividad</th><th>Fecha Inicio</th><th>Fecha Término</th></tr></thead><tbody>'+
+      lista.map(a=>'<tr><td>'+esc(a.nombre)+'</td><td>'+fmtFecha(a.fechaInicio)+'</td><td>'+
+        (a.fechaTermino?fmtFecha(a.fechaTermino):"—")+'</td></tr>').join("")+
+      '</tbody></table>';
+  }
+  document.getElementById("kpiCuerpo").innerHTML = html;
+  document.getElementById("modalKpi").classList.add("on");
+}
+function cerrarModalKpi(){ document.getElementById("modalKpi").classList.remove("on"); }
+function imprimirKpi(){
+  document.body.classList.add("print-kpi");
+  window.print();
+  setTimeout(()=>document.body.classList.remove("print-kpi"),500);
+}
+
+/* ============================================================
    INICIALIZACIÓN
    ============================================================ */
 (function init(){
@@ -1195,6 +1272,7 @@ function cerrarModalConfig(){ document.getElementById("modalCfg").classList.remo
     if(e.key!=="Escape") return;
     if(document.getElementById("modalAct").classList.contains("on")) cerrarModalActividad();
     if(document.getElementById("modalCfg").classList.contains("on")) cerrarModalConfig();
+    if(document.getElementById("modalKpi").classList.contains("on")) cerrarModalKpi();
   });
 
   renderTodo();
