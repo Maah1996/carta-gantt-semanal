@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="claro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carta Gantt de Planificación y Control de Actividades</title>
+
+<!-- Librerías por CDN (únicas dependencias externas) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style>
+/* ============================================================
+   PALETA EJECUTIVA — variables de tema
+   ============================================================ */
+:root{
+  --azul:#1e3a5f;
+  --azul-osc:#16314f;
+  --fondo:#f4f5f7;
+  --panel:#ffffff;
+  --texto:#1f2937;
+  --texto-suave:#5b6470;
+  --borde:#d8dce3;
+  --linea-mes:#aeb6c2;
+  --sombra:0 1px 3px rgba(20,30,45,.10);
+  --vencida:#8b2332;
+  --porvencer:#b45309;
+  --aldia:#166534;
+  --hoy:rgba(139,35,50,.07);
+}
+[data-theme="oscuro"]{
+  --fondo:#14181f;
+  --panel:#1c232e;
+  --texto:#e2e6ec;
+  --texto-suave:#9aa4b1;
+  --borde:#303a48;
+  --linea-mes:#46546a;
+  --sombra:0 1px 3px rgba(0,0,0,.45);
+  --hoy:rgba(180,90,100,.12);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Times New Roman",Times,serif;
+  background:var(--fondo);
+  color:var(--texto);
+  font-size:14px;
+}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{
+  font-family:inherit;font-size:13px;color:var(--texto);
+  background:var(--panel);border:1px solid var(--borde);
+  border-radius:4px;padding:5px 7px;width:100%;
+}
+input:focus,select:focus,textarea:focus{outline:1.5px solid var(--azul)}
+h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
+
+/* ============================================================
+   ENCABEZADO INSTITUCIONAL
+   ============================================================ */
+.app-header{
+  background:var(--azul);color:#fff;
+  padding:14px 22px 12px;text-align:center;
+}
+.app-header h1{font-size:19px;font-weight:bold;letter-spacing:.12em}
+.head-datos{
+  display:flex;flex-wrap:wrap;gap:6px 26px;justify-content:center;
+  margin-top:8px;font-size:12.5px;color:#cfd8e4;
+}
+.head-datos b{color:#fff;font-weight:bold}
+
+/* ============================================================
+   BARRA DE HERRAMIENTAS
+   ============================================================ */
+.toolbar{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  padding:9px 22px;background:var(--panel);
+  border-bottom:1px solid var(--borde);
+}
+.btn{
+  background:var(--azul);color:#fff;border:none;border-radius:4px;
+  padding:6px 13px;font-size:12.5px;letter-spacing:.04em;
+}
+.btn:hover{background:var(--azul-osc)}
+.btn.sec{background:transparent;color:var(--texto);border:1px solid var(--borde)}
+.btn.sec:hover{border-color:var(--azul);color:var(--azul)}
+[data-theme="oscuro"] .btn.sec:hover{color:#9db8d8;border-color:#9db8d8}
+.btn.peq{padding:2px 8px;font-size:11.5px}
+.btn.peligro{background:transparent;border:1px solid var(--borde);color:var(--vencida)}
+.toolbar .sep{flex:1}
+
+/* ============================================================
+   TARJETAS KPI
+   ============================================================ */
+.kpis{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));
+  gap:10px;padding:14px 22px 4px;
+}
+.kpi{
+  background:var(--panel);border:1px solid var(--borde);border-radius:5px;
+  box-shadow:var(--sombra);padding:9px 12px;border-top:3px solid var(--azul);
+}
+.kpi .num{font-size:23px;font-weight:bold;line-height:1.1}
+.kpi .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--texto-suave)}
+.kpi.k-atrasadas{border-top-color:var(--vencida)}
+.kpi.k-porvencer{border-top-color:var(--porvencer)}
+.kpi.k-finalizadas{border-top-color:var(--aldia)}
+
+/* ============================================================
+   DISPOSICIÓN GENERAL
+   ============================================================ */
+.layout{display:flex;gap:14px;padding:12px 22px 26px;align-items:flex-start}
+.sidebar{width:268px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.content{flex:1;min-width:0}
+
+.card{
+  background:var(--panel);border:1px solid var(--borde);border-radius:6px;
+  box-shadow:var(--sombra);padding:13px 14px;
+}
+.card h3{
+  font-size:12px;color:var(--azul);border-bottom:1px solid var(--borde);
+  padding-bottom:6px;margin-bottom:10px;
+}
+[data-theme="oscuro"] .card h3{color:#9db8d8}
+.campo{margin-bottom:8px}
+.campo label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--texto-suave);margin-bottom:2px}
+.fila2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.aviso-semana{font-size:12px;color:var(--azul);font-weight:bold;min-height:16px;margin:2px 0 6px}
+[data-theme="oscuro"] .aviso-semana{color:#9db8d8}
+
+/* Leyenda de categorías */
+.leyenda{display:flex;flex-direction:column;gap:5px}
+.leyenda div{display:flex;align-items:center;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.cuadro{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+
+/* ============================================================
+   PESTAÑAS
+   ============================================================ */
+.tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:2px solid var(--borde)}
+.tab{
+  background:transparent;border:none;padding:8px 16px;font-size:13px;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--texto-suave);
+  border-bottom:3px solid transparent;margin-bottom:-2px;
+}
+.tab.on{color:var(--azul);border-bottom-color:var(--azul);font-weight:bold}
+[data-theme="oscuro"] .tab.on{color:#9db8d8;border-bottom-color:#9db8d8}
+.seccion{display:none}
+.seccion.on{display:block}
+
+/* ============================================================
+   FILTROS
+   ============================================================ */
+.filtros{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;
+  background:var(--panel);border:1px solid var(--borde);border-radius:6px;
+  padding:9px 12px;margin-bottom:10px;box-shadow:var(--sombra);
+}
+.filtros .campo{margin:0;min-width:120px;flex:1}
+.filtros .campo.buscador{min-width:190px;flex:1.6}
+
+/* ============================================================
+   CARTA GANTT
+   ============================================================ */
+.gantt-scroll{
+  overflow:auto;max-height:62vh;
+  background:var(--panel);border:1px solid var(--borde);border-radius:6px;
+  box-shadow:var(--sombra);
+}
+.grow{
+  display:grid;
+  grid-template-columns:40px 175px 100px 100px 86px 92px 92px 66px 116px minmax(1260px,1fr);
+  min-width:2130px;
+  border-bottom:1px solid var(--borde);
+  align-items:stretch;
+}
+.grow>div{padding:4px 6px;font-size:12px;display:flex;align-items:center;border-right:1px solid var(--borde)}
+.ghead{position:sticky;top:0;z-index:5;background:var(--azul);color:#fff;border-bottom:2px solid var(--azul-osc)}
+.ghead>div{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid rgba(255,255,255,.18);padding:0 6px}
+.ghead .ord{cursor:pointer;user-select:none}
+.ghead .ord:hover{text-decoration:underline}
+.tl-head{display:block!important;padding:0!important}
+.tl-meses,.tl-sems{display:grid;grid-template-columns:repeat(60,1fr)}
+.tl-meses div{
+  grid-column:span 5;text-align:center;font-size:10.5px;padding:3px 0;
+  border-right:1px solid rgba(255,255,255,.30);overflow:hidden;white-space:nowrap;
+}
+.tl-sems div{
+  text-align:center;font-size:9px;padding:2px 0;cursor:pointer;
+  border-right:1px solid rgba(255,255,255,.14);border-top:1px solid rgba(255,255,255,.18);
+}
+.tl-sems div:hover{background:rgba(255,255,255,.14)}
+.tl-sems div.hoy{background:rgba(255,255,255,.22);font-weight:bold;outline:1px solid #d9a0a8}
+
+.gfila:nth-child(even){background:rgba(120,130,145,.05)}
+.gfila .nom{font-weight:bold;overflow:hidden}
+.gfila .nom span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.celda-cat{gap:6px}
+.sub{display:block;font-size:10px;color:var(--texto-suave)}
+
+/* Celda de línea de tiempo con cuadrícula semanal */
+.tl{
+  position:relative;padding:0!important;border-right:none!important;
+  background-image:
+    linear-gradient(to right,var(--linea-mes) 1px,transparent 1px),
+    linear-gradient(to right,var(--borde) 1px,transparent 1px);
+  background-size:calc(100%/12) 100%,calc(100%/60) 100%;
+  min-height:32px;
+}
+.marca-hoy{position:absolute;top:0;bottom:0;background:var(--hoy);border-left:2px solid var(--vencida);pointer-events:none}
+.barra{
+  position:absolute;top:5px;bottom:5px;border-radius:3px;overflow:hidden;
+  display:flex;align-items:center;
+}
+.barra .relleno{position:absolute;left:0;top:0;bottom:0}
+.barra .etq{
+  position:relative;z-index:1;color:#fff;font-size:10.5px;padding:0 6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-shadow:0 1px 2px rgba(0,0,0,.55);width:100%;
+}
+
+/* Insignias (badges) de estado y alerta */
+.badge{
+  display:inline-block;padding:1px 8px;border-radius:3px;
+  font-size:10.5px;letter-spacing:.03em;white-space:nowrap;
+}
+.b-Pendiente{background:rgba(100,116,139,.16);color:#475569}
+.b-EnEjecucion{background:rgba(30,58,95,.14);color:#1e3a5f}
+.b-Finalizada{background:rgba(22,101,52,.14);color:#166534}
+.b-Suspendida{background:rgba(120,120,120,.18);color:#6b7280}
+[data-theme="oscuro"] .b-Pendiente{color:#aab6c6}
+[data-theme="oscuro"] .b-EnEjecucion{color:#9db8d8}
+[data-theme="oscuro"] .b-Finalizada{color:#86c79b}
+[data-theme="oscuro"] .b-Suspendida{color:#9aa4b1}
+.alerta{display:flex;align-items:center;gap:5px;font-size:10.5px;margin-top:2px}
+.alerta .pto{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.a-vencida{color:var(--vencida)}.a-vencida .pto{background:var(--vencida)}
+.a-porvencer{color:var(--porvencer)}.a-porvencer .pto{background:var(--porvencer)}
+.a-aldia{color:var(--aldia)}.a-aldia .pto{background:var(--aldia)}
+[data-theme="oscuro"] .a-vencida{color:#d98a96}
+[data-theme="oscuro"] .a-porvencer{color:#d9a45f}
+[data-theme="oscuro"] .a-aldia{color:#86c79b}
+
+.acciones{display:flex;gap:4px;flex-wrap:wrap}
+.sel-avance{width:62px;padding:2px 3px;font-size:11.5px}
+.vacio{padding:26px;text-align:center;color:var(--texto-suave);font-style:italic}
+
+/* ============================================================
+   MÓDULO REVISAR ACTIVIDADES
+   ============================================================ */
+.rev-controles{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;
+  background:var(--panel);border:1px solid var(--borde);border-radius:6px;
+  padding:11px 13px;margin-bottom:12px;box-shadow:var(--sombra);
+}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--borde);background:transparent;color:var(--texto);
+  border-radius:4px;padding:5px 13px;font-size:12.5px;letter-spacing:.03em;
+}
+.chip.on{background:var(--azul);color:#fff;border-color:var(--azul);font-weight:bold}
+.bloque-sem{margin-bottom:16px}
+.bloque-sem h4{
+  font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;
+  background:var(--azul);color:#fff;border-radius:5px 5px 0 0;padding:7px 12px;
+}
+.bloque-cuerpo{
+  border:1px solid var(--borde);border-top:none;border-radius:0 0 5px 5px;
+  background:var(--panel);box-shadow:var(--sombra);
+}
+.ficha{
+  display:flex;gap:12px;padding:10px 12px;border-bottom:1px solid var(--borde);
+  border-left:4px solid var(--borde);align-items:flex-start;flex-wrap:wrap;
+}
+.ficha:last-child{border-bottom:none}
+.ficha .cuando{width:118px;flex-shrink:0}
+.ficha .cuando .dia{font-weight:bold;font-size:13px}
+.ficha .cuando .fch{font-size:11.5px;color:var(--texto-suave)}
+.ficha .que{flex:1;min-width:200px}
+.ficha .que .tit{font-weight:bold;font-size:13.5px}
+.ficha .que .des{font-size:12px;color:var(--texto-suave);margin-top:1px}
+.ficha .meta{display:flex;flex-direction:column;gap:4px;align-items:flex-end;font-size:11.5px}
+.sin-act{padding:14px;color:var(--texto-suave);font-style:italic;font-size:12.5px}
+
+/* ============================================================
+   RESUMEN Y GRÁFICOS
+   ============================================================ */
+.graficos{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-bottom:14px}
+.grafico-card{background:var(--panel);border:1px solid var(--borde);border-radius:6px;box-shadow:var(--sombra);padding:12px}
+.grafico-card h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--texto-suave);margin-bottom:8px;text-align:center}
+.grafico-card canvas{max-height:215px}
+.res-tablas{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.mini-tabla{width:100%;border-collapse:collapse;font-size:12px}
+.mini-tabla td{padding:3px 6px;border-bottom:1px solid var(--borde)}
+.mini-tabla td:last-child{text-align:right;font-weight:bold}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+.btn-menu{display:none}
+@media (max-width:980px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%;display:none}
+  .sidebar.abierto{display:flex}
+  .btn-menu{display:inline-block}
+  .gantt-scroll{max-height:none}
+}
+
+/* ============================================================
+   IMPRESIÓN
+   ============================================================ */
+@page{size:A4 landscape;margin:9mm}
+@media print{
+  .toolbar,.sidebar,.tabs,.filtros,.rev-controles,.acciones,.btn-menu,.sel-avance{display:none!important}
+  body{background:#fff}
+  .layout{padding:0}
+  .gantt-scroll{max-height:none;overflow:visible;border:none;box-shadow:none}
+  .card,.kpi,.grafico-card,.bloque-cuerpo{box-shadow:none}
+  .app-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ ENCABEZADO INSTITUCIONAL ============ -->
+<header class="app-header">
+  <h1>Carta Gantt de Planificación y Control de Actividades</h1>
+  <div class="head-datos" id="headDatos"></div>
+</header>
+
+<!-- ============ BARRA DE HERRAMIENTAS ============ -->
+<div class="toolbar">
+  <button class="btn sec btn-menu" onclick="alternarMenu()">Panel</button>
+  <button class="btn" onclick="exportarPDF()">Exportar PDF</button>
+  <button class="btn" onclick="exportarExcel()">Exportar Excel</button>
+  <button class="btn sec" onclick="window.print()">Imprimir</button>
+  <span class="sep"></span>
+  <button class="btn sec" onclick="exportarJSON()">Exportar respaldo (JSON)</button>
+  <button class="btn sec" onclick="document.getElementById('archivoJSON').click()">Importar respaldo (JSON)</button>
+  <input type="file" id="archivoJSON" accept=".json" style="display:none" onchange="importarJSON(this)">
+  <button class="btn sec" id="btnTema" onclick="alternarTema()">Modo oscuro</button>
+</div>
+
+<!-- ============ TARJETAS KPI ============ -->
+<section class="kpis" id="kpis"></section>
+
+<main class="layout">
+
+  <!-- ============ PANEL LATERAL ============ -->
+  <aside class="sidebar" id="sidebar">
+
+    <div class="card">
+      <h3>Datos Generales</h3>
+      <div class="campo"><label>Nombre de la Unidad</label><input id="cfgUnidad"></div>
+      <div class="campo"><label>Departamento</label><input id="cfgDepto"></div>
+      <div class="campo"><label>Responsable</label><input id="cfgResp"></div>
+      <div class="campo"><label>Año</label><input id="cfgAnio" type="number" min="2000" max="2100"></div>
+      <button class="btn" style="width:100%" onclick="guardarConfig()">Guardar Configuración</button>
+    </div>
+
+    <div class="card">
+      <h3 id="tituloForm">Gestión de Actividades</h3>
+      <form id="formAct" onsubmit="return guardarActividad(event)">
+        <div class="campo"><label>Nombre Actividad *</label><input id="fNombre" required maxlength="120"></div>
+        <div class="campo"><label>Descripción</label><textarea id="fDesc" rows="2" maxlength="400"></textarea></div>
+        <div class="campo"><label>Responsable</label><input id="fResp" maxlength="60"></div>
+        <div class="fila2">
+          <div class="campo"><label>Fecha Inicio *</label><input id="fIni" type="date" required onchange="previewSemana()"></div>
+          <div class="campo"><label>Fecha Término</label><input id="fFin" type="date" onchange="previewSemana()"></div>
+        </div>
+        <div class="aviso-semana" id="avisoSemana"></div>
+        <div class="fila2">
+          <div class="campo"><label>Categoría</label><select id="fCat"></select></div>
+          <div class="campo"><label>Prioridad</label>
+            <select id="fPrio"><option>Alta</option><option selected>Media</option><option>Baja</option></select>
+          </div>
+        </div>
+        <div class="fila2">
+          <div class="campo"><label>Estado</label>
+            <select id="fEstado"><option>Pendiente</option><option>En Ejecución</option><option>Finalizada</option><option>Suspendida</option></select>
+          </div>
+          <div class="campo"><label>% Avance</label><select id="fAvance"></select></div>
+        </div>
+        <button class="btn" style="width:100%" type="submit" id="btnGuardarAct">Agregar Actividad</button>
+        <button class="btn sec" style="width:100%;margin-top:6px;display:none" type="button" id="btnCancelar" onclick="cancelarEdicion()">Cancelar edición</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Leyenda</h3>
+      <div class="leyenda" id="leyenda"></div>
+    </div>
+
+  </aside>
+
+  <!-- ============ CONTENIDO PRINCIPAL ============ -->
+  <section class="content">
+
+    <nav class="tabs">
+      <button class="tab on" data-tab="gantt" onclick="cambiarTab('gantt')">Carta Gantt</button>
+      <button class="tab" data-tab="revisar" onclick="cambiarTab('revisar')">Revisar Actividades</button>
+      <button class="tab" data-tab="resumen" onclick="cambiarTab('resumen')">Resumen y Gráficos</button>
+    </nav>
+
+    <!-- ——— PESTAÑA: CARTA GANTT ——— -->
+    <section class="seccion on" id="sec-gantt">
+      <div class="filtros">
+        <div class="campo buscador"><label>Buscar</label>
+          <input id="filBusca" placeholder="Actividad, responsable o categoría…" oninput="aplicarFiltros()">
+        </div>
+        <div class="campo"><label>Responsable</label><select id="filResp" onchange="aplicarFiltros()"></select></div>
+        <div class="campo"><label>Categoría</label><select id="filCat" onchange="aplicarFiltros()"></select></div>
+        <div class="campo"><label>Estado</label><select id="filEstado" onchange="aplicarFiltros()"></select></div>
+        <div class="campo"><label>Prioridad</label><select id="filPrio" onchange="aplicarFiltros()"></select></div>
+        <div class="campo"><label>Mes</label><select id="filMes" onchange="aplicarFiltros()"></select></div>
+        <button class="btn sec" onclick="limpiarFiltros()">Limpiar</button>
+      </div>
+      <div class="gantt-scroll" id="ganttArea"></div>
+    </section>
+
+    <!-- ——— PESTAÑA: REVISAR ACTIVIDADES ——— -->
+    <section class="seccion" id="sec-revisar">
+      <div class="rev-controles">
+        <div class="campo" style="min-width:150px"><label>Mes</label>
+          <select id="revMes" onchange="cambiarMesRevisar()"></select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;text-transform:uppercase;color:var(--texto-suave);margin-bottom:3px">Semanas (clic para activar una o varias)</label>
+          <div class="chips" id="revChips"></div>
+        </div>
+        <button class="btn sec" onclick="revTodoElMes()">Todo el mes</button>
+        <button class="btn sec" onclick="revSemanaActual()">Semana actual</button>
+      </div>
+      <div id="revResultado"></div>
+    </section>
+
+    <!-- ——— PESTAÑA: RESUMEN Y GRÁFICOS ——— -->
+    <section class="seccion" id="sec-resumen">
+      <div class="graficos">
+        <div class="grafico-card"><h4>Actividades por Estado</h4><canvas id="chEstado"></canvas></div>
+        <div class="grafico-card"><h4>Actividades por Categoría</h4><canvas id="chCategoria"></canvas></div>
+        <div class="grafico-card"><h4>Actividades por Responsable</h4><canvas id="chResponsable"></canvas></div>
+        <div class="grafico-card"><h4>Avance General</h4><canvas id="chAvance"></canvas></div>
+      </div>
+      <div class="res-tablas" id="resTablas"></div>
+    </section>
+
+  </section>
+</main>
+
+<script>
+"use strict";
+/* ============================================================
+   CONSTANTES Y CONFIGURACIÓN BASE
+   ============================================================ */
+const MESES   = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+const MESES_M = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const DIAS    = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+/* Paleta ejecutiva de categorías */
+const CATEGORIAS = {
+  "Actividad Unidad":  "#1e3a5f",
+  "Coordinación":      "#2c6e63",
+  "Reunión":           "#9c7c38",
+  "Actividad Crítica": "#8b2332",
+  "Capacitación":      "#5d4a66",
+  "Auditoría":         "#a85b2a",
+  "Inspección":        "#4a7fa5",
+  "Seguimiento":       "#64748b"
+};
+const COLOR_FINALIZADA = "#3f4750";
+
+const LS = { cfg:"cgs_config", act:"cgs_actividades", fil:"cgs_filtros", tema:"cgs_tema" };
+
+/* ============================================================
+   ESTADO DE LA APLICACIÓN
+   ============================================================ */
+let config = null;
+let actividades = [];
+let filtros = { busca:"", resp:"", cat:"", estado:"", prio:"", mes:"" };
+let orden = { clave:"fechaInicio", dir:1 };
+let editId = null;
+let revisar = { mes:1, semanas:[1] };
+let charts = {};
+
+/* ============================================================
+   UTILIDADES DE FECHA Y SEMANA
+   Regla fija: día 1–7=S1, 8–14=S2, 15–21=S3, 22–28=S4, 29+=S5
+   ============================================================ */
+function pf(s){ const [y,m,d] = s.split("-").map(Number); return {y,m,d}; }
+function diasMes(y,m){ return new Date(y,m,0).getDate(); }
+function semanaDeDia(d){ return Math.min(Math.ceil(d/7),5); }
+function idxSemana(m,s){ return (m-1)*5 + (s-1); }          // índice 0..59 dentro del año
+function hoyCero(){ const h=new Date(); h.setHours(0,0,0,0); return h; }
+function aDate(s){ const f=pf(s); return new Date(f.y,f.m-1,f.d); }
+function fmtCorta(s){ const f=pf(s); return String(f.d).padStart(2,"0")+"/"+String(f.m).padStart(2,"0"); }
+function fmtLarga(s){ const f=pf(s); const dt=aDate(s); return DIAS[dt.getDay()]+" "+f.d+" de "+MESES_M[f.m-1]+" de "+f.y; }
+function etiquetaSemana(s){ const f=pf(s); return MESES[f.m-1].slice(0,3)+" · S"+semanaDeDia(f.d); }
+
+/* Rango de días que abarca una semana de un mes (para los títulos) */
+function rangoSemana(anio,mes,sem){
+  const dm = diasMes(anio,mes);
+  const ini = (sem-1)*7+1;
+  if(ini>dm) return null;                                   // S5 inexistente en meses cortos
+  const fin = (sem===5) ? dm : Math.min(sem*7,dm);
+  return {ini,fin};
+}
+
+/* Tramo de la actividad en índices de semana 0..59, recortado al año configurado.
+   Devuelve null si la actividad no toca el año. */
+function tramo(a){
+  const anio = config.anio;
+  const i = pf(a.fechaInicio), t = pf(a.fechaTermino || a.fechaInicio);
+  if(t.y < anio || i.y > anio) return null;
+  const i0 = (i.y < anio) ? 0  : idxSemana(i.m, semanaDeDia(i.d));
+  const i1 = (t.y > anio) ? 59 : idxSemana(t.m, semanaDeDia(t.d));
+  return { i0, i1: Math.max(i0,i1) };
+}
+
+/* Alerta de plazo: vencida / porvencer / aldia (null si finalizada) */
+function alertaDe(a){
+  if(a.estado === "Finalizada") return null;
+  const fin = aDate(a.fechaTermino || a.fechaInicio);
+  const hoy = hoyCero();
+  if(fin < hoy) return "vencida";
+  const lim = new Date(hoy); lim.setDate(lim.getDate()+7);
+  if(fin <= lim) return "porvencer";
+  return "aldia";
+}
+const TXT_ALERTA = { vencida:"Vencida", porvencer:"Por vencer", aldia:"Al día" };
+
+/* ============================================================
+   PERSISTENCIA (LocalStorage + respaldo JSON)
+   ============================================================ */
+function guardar(){
+  config.fechaActualizacion = new Date().toISOString().slice(0,10);
+  localStorage.setItem(LS.cfg, JSON.stringify(config));
+  localStorage.setItem(LS.act, JSON.stringify(actividades));
+  localStorage.setItem(LS.fil, JSON.stringify(filtros));
+}
+function cargar(){
+  try{
+    config      = JSON.parse(localStorage.getItem(LS.cfg))  || null;
+    actividades = JSON.parse(localStorage.getItem(LS.act))  || [];
+    filtros     = Object.assign(filtros, JSON.parse(localStorage.getItem(LS.fil)) || {});
+  }catch(e){ config=null; actividades=[]; }
+  if(!config) iniciarDatosEjemplo();
+}
+function exportarJSON(){
+  const blob = new Blob([JSON.stringify({config,actividades},null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "respaldo_carta_gantt_"+config.anio+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importarJSON(inp){
+  const f = inp.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      if(!d.config || !Array.isArray(d.actividades)) throw new Error("estructura inválida");
+      if(!confirm("Esto reemplazará los datos actuales por los del respaldo. ¿Continuar?")) return;
+      config = d.config; actividades = d.actividades;
+      guardar(); renderTodo();
+      alert("Respaldo importado correctamente.");
+    }catch(e){ alert("El archivo no es un respaldo válido de este sistema."); }
+    inp.value = "";
+  };
+  r.readAsText(f);
+}
+
+/* ============================================================
+   DATOS DE EJEMPLO (solo en primer uso)
+   ============================================================ */
+function iniciarDatosEjemplo(){
+  const Y = new Date().getFullYear();
+  config = {
+    unidad:"Unidad de Planificación y Control", depto:"Departamento de Gestión",
+    responsable:"Jefe de Unidad", anio:Y,
+    fechaCreacion:new Date().toISOString().slice(0,10),
+    fechaActualizacion:new Date().toISOString().slice(0,10)
+  };
+  const d = (m,dd)=> Y+"-"+String(m).padStart(2,"0")+"-"+String(dd).padStart(2,"0");
+  let n = 0;
+  const A = (nombre,desc,resp,fi,ff,cat,prio,est,av)=>({id:++n,nombre,descripcion:desc,responsable:resp,
+    fechaInicio:fi,fechaTermino:ff,categoria:cat,prioridad:prio,estado:est,avance:av});
+  actividades = [
+    A("Planificación anual de la unidad","Formulación del plan anual de actividades y metas.","J. Soto",d(1,5),d(1,16),"Actividad Unidad","Alta","Finalizada",100),
+    A("Reunión de coordinación mensual","Revisión de avances con jefaturas de área.","M. Pérez",d(2,9),"","Reunión","Media","Finalizada",100),
+    A("Capacitación sistema documental","Inducción al nuevo registro documental.","C. Rojas",d(3,2),d(3,13),"Capacitación","Media","Finalizada",100),
+    A("Auditoría interna primer trimestre","Revisión de procesos críticos del 1er trimestre.","J. Soto",d(3,23),d(4,10),"Auditoría","Alta","Finalizada",100),
+    A("Inspección de dependencias","Inspección general de instalaciones.","M. Pérez",d(5,18),d(5,22),"Inspección","Media","Finalizada",100),
+    A("Actualización matriz de riesgos","Revisión y actualización de la matriz institucional.","C. Rojas",d(5,25),d(6,5),"Actividad Crítica","Alta","En Ejecución",60),
+    A("Coordinación interinstitucional","Mesa de trabajo con organismos externos.","J. Soto",d(6,8),d(6,16),"Coordinación","Alta","En Ejecución",40),
+    A("Seguimiento compromisos semestrales","Control de compromisos del primer semestre.","M. Pérez",d(7,1),d(7,31),"Seguimiento","Media","Pendiente",0),
+    A("Capacitación segundo semestre","Programa de capacitación interna.","C. Rojas",d(8,17),d(8,28),"Capacitación","Baja","Pendiente",0),
+    A("Auditoría segundo semestre","Auditoría de cierre de gestión.","J. Soto",d(10,12),d(10,30),"Auditoría","Alta","Pendiente",0)
+  ];
+  guardar();
+}
+
+/* ============================================================
+   LISTAS DE TRABAJO (año + filtros + orden)
+   ============================================================ */
+function actsAnio(){ return actividades.filter(a=>tramo(a)!==null); }
+
+function actsFiltradas(){
+  const q = filtros.busca.trim().toLowerCase();
+  let lista = actsAnio().filter(a=>{
+    if(filtros.resp   && a.responsable!==filtros.resp) return false;
+    if(filtros.cat    && a.categoria  !==filtros.cat ) return false;
+    if(filtros.estado && a.estado     !==filtros.estado) return false;
+    if(filtros.prio   && a.prioridad  !==filtros.prio) return false;
+    if(filtros.mes){
+      const t = tramo(a), m = Number(filtros.mes);
+      const m0=(m-1)*5, m1=m0+4;
+      if(t.i1<m0 || t.i0>m1) return false;
+    }
+    if(q){
+      const txt = (a.nombre+" "+(a.responsable||"")+" "+a.categoria).toLowerCase();
+      if(!txt.includes(q)) return false;
+    }
+    return true;
+  });
+  const k = orden.clave, dir = orden.dir;
+  lista.sort((a,b)=>{
+    let va=a[k], vb=b[k];
+    if(k==="fechaInicio"){ va=a.fechaInicio; vb=b.fechaInicio; }
+    if(typeof va==="string") return va.localeCompare(vb)*dir;
+    return (va-vb)*dir;
+  });
+  return lista;
+}
+
+/* ============================================================
+   RENDER GENERAL
+   ============================================================ */
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function colorDe(a){ return a.estado==="Finalizada" ? COLOR_FINALIZADA : (CATEGORIAS[a.categoria]||"#64748b"); }
+function hexA(hex,al){
+  const n=parseInt(hex.slice(1),16);
+  return "rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+al+")";
+}
+
+function renderTodo(){
+  renderEncabezado(); renderKPIs(); renderOpcionesFiltros();
+  renderGantt(); renderRevisar();
+  if(document.getElementById("sec-resumen").classList.contains("on")) renderResumen();
+  cargarConfigEnFormulario();
+}
+
+/* ——— Encabezado institucional ——— */
+function renderEncabezado(){
+  const h = document.getElementById("headDatos");
+  h.innerHTML =
+    "<span>Unidad: <b>"+esc(config.unidad||"—")+"</b></span>"+
+    "<span>Departamento: <b>"+esc(config.depto||"—")+"</b></span>"+
+    "<span>Responsable: <b>"+esc(config.responsable||"—")+"</b></span>"+
+    "<span>Año: <b>"+config.anio+"</b></span>"+
+    "<span>Creación: <b>"+esc(config.fechaCreacion)+"</b></span>"+
+    "<span>Actualización: <b>"+esc(config.fechaActualizacion)+"</b></span>";
+}
+
+/* ——— Tarjetas KPI ——— */
+function renderKPIs(){
+  const L = actsAnio();
+  const cnt = e => L.filter(a=>a.estado===e).length;
+  const venc = L.filter(a=>alertaDe(a)==="vencida").length;
+  const prox = L.filter(a=>alertaDe(a)==="porvencer").length;
+  const avg  = L.length ? Math.round(L.reduce((s,a)=>s+Number(a.avance||0),0)/L.length) : 0;
+  const tarjetas = [
+    ["Total Actividades", L.length, ""],
+    ["Pendientes",        cnt("Pendiente"), ""],
+    ["En Ejecución",      cnt("En Ejecución"), ""],
+    ["Finalizadas",       cnt("Finalizada"), "k-finalizadas"],
+    ["Atrasadas",         venc, "k-atrasadas"],
+    ["Próximas a vencer", prox, "k-porvencer"],
+    ["% Avance General",  avg+"%", ""]
+  ];
+  document.getElementById("kpis").innerHTML = tarjetas.map(t=>
+    '<div class="kpi '+t[2]+'"><div class="num">'+t[1]+'</div><div class="lbl">'+t[0]+'</div></div>').join("");
+}
+
+/* ——— Opciones dinámicas de filtros ——— */
+function renderOpcionesFiltros(){
+  const L = actsAnio();
+  const op = (arr,sel)=> '<option value="">Todos</option>'+arr.map(v=>'<option'+(v===sel?" selected":"")+'>'+esc(v)+'</option>').join("");
+  const resps = [...new Set(L.map(a=>a.responsable).filter(Boolean))].sort();
+  document.getElementById("filResp").innerHTML   = op(resps,filtros.resp);
+  document.getElementById("filCat").innerHTML    = op(Object.keys(CATEGORIAS),filtros.cat);
+  document.getElementById("filEstado").innerHTML = op(["Pendiente","En Ejecución","Finalizada","Suspendida"],filtros.estado);
+  document.getElementById("filPrio").innerHTML   = op(["Alta","Media","Baja"],filtros.prio);
+  document.getElementById("filMes").innerHTML    = '<option value="">Todos</option>'+
+    MESES.map((m,i)=>'<option value="'+(i+1)+'"'+(String(i+1)===String(filtros.mes)?" selected":"")+'>'+m+'</option>').join("");
+  document.getElementById("filBusca").value = filtros.busca;
+}
+function aplicarFiltros(){
+  filtros.busca  = document.getElementById("filBusca").value;
+  filtros.resp   = document.getElementById("filResp").value;
+  filtros.cat    = document.getElementById("filCat").value;
+  filtros.estado = document.getElementById("filEstado").value;
+  filtros.prio   = document.getElementById("filPrio").value;
+  filtros.mes    = document.getElementById("filMes").value;
+  guardar(); renderGantt(); renderKPIs();
+}
+function limpiarFiltros(){
+  filtros = { busca:"", resp:"", cat:"", estado:"", prio:"", mes:"" };
+  guardar(); renderOpcionesFiltros(); renderGantt(); renderKPIs();
+}
+
+/* ============================================================
+   CARTA GANTT
+   ============================================================ */
+function ordenarPor(clave){
+  if(orden.clave===clave) orden.dir*=-1; else { orden.clave=clave; orden.dir=1; }
+  renderGantt();
+}
+function flecha(clave){ return orden.clave===clave ? (orden.dir===1?" ▲":" ▼") : ""; }
+
+function renderGantt(){
+  const L = actsFiltradas();
+  const anio = config.anio;
+  const hoy = new Date();
+  const idxHoy = (hoy.getFullYear()===anio) ? idxSemana(hoy.getMonth()+1, semanaDeDia(hoy.getDate())) : -1;
+
+  /* Encabezado: columnas fijas + línea de tiempo (meses / semanas) */
+  let html = '<div class="grow ghead">'+
+    '<div class="ord" onclick="ordenarPor(\'id\')">ID'+flecha("id")+'</div>'+
+    '<div class="ord" onclick="ordenarPor(\'nombre\')">Actividad'+flecha("nombre")+'</div>'+
+    '<div>Responsable</div><div>Categoría</div>'+
+    '<div class="ord" onclick="ordenarPor(\'fechaInicio\')">Inicio'+flecha("fechaInicio")+'</div>'+
+    '<div>Término</div><div>Estado</div>'+
+    '<div class="ord" onclick="ordenarPor(\'avance\')">Avance'+flecha("avance")+'</div>'+
+    '<div>Acciones</div>'+
+    '<div class="tl-head"><div class="tl-meses">'+
+      MESES.map(m=>'<div title="'+m+'">'+m.slice(0,3)+'</div>').join("")+
+    '</div><div class="tl-sems">'+
+      MESES.map((m,mi)=>[1,2,3,4,5].map(s=>{
+        const cls = (idxSemana(mi+1,s)===idxHoy) ? ' class="hoy"' : '';
+        return '<div'+cls+' title="'+m+' · SEMANA '+s+' — clic para revisar" onclick="abrirRevisar('+(mi+1)+','+s+')">S'+s+'</div>';
+      }).join("")).join("")+
+    '</div></div></div>';
+
+  /* Filas de actividades */
+  if(!L.length){
+    html += '<div class="vacio">No hay actividades que coincidan con los filtros para el año '+anio+'.</div>';
+  }
+  for(const a of L){
+    const t = tramo(a), col = colorDe(a), al = alertaDe(a);
+    const av = Number(a.avance||0);
+    const selAv = '<select class="sel-avance" onchange="cambiarAvance('+a.id+',this.value)">'+
+      [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'"'+(v===av?" selected":"")+'>'+v+'%</option>').join("")+'</select>';
+    const alertaHTML = al ? '<span class="alerta a-'+al+'"><span class="pto"></span>'+TXT_ALERTA[al]+'</span>' : "";
+    const fIni = pf(a.fechaInicio), fFin = pf(a.fechaTermino||a.fechaInicio);
+    html += '<div class="grow gfila">'+
+      '<div>'+a.id+'</div>'+
+      '<div class="nom"><span title="'+esc(a.nombre)+(a.descripcion?" — "+esc(a.descripcion):"")+'">'+esc(a.nombre)+'</span></div>'+
+      '<div>'+esc(a.responsable||"—")+'</div>'+
+      '<div class="celda-cat"><span class="cuadro" style="background:'+col+'"></span>'+esc(a.categoria)+'</div>'+
+      '<div><div>'+fmtCorta(a.fechaInicio)+'<span class="sub">'+etiquetaSemana(a.fechaInicio)+'</span></div></div>'+
+      '<div><div>'+(a.fechaTermino?fmtCorta(a.fechaTermino):"—")+
+        '<span class="sub">'+(a.fechaTermino?etiquetaSemana(a.fechaTermino):"un día")+'</span>'+alertaHTML+'</div></div>'+
+      '<div><span class="badge b-'+a.estado.replace(/\s/g,"")+'">'+a.estado+'</span></div>'+
+      '<div>'+selAv+'</div>'+
+      '<div class="acciones">'+
+        '<button class="btn sec peq" onclick="editarAct('+a.id+')">Editar</button>'+
+        '<button class="btn sec peq" onclick="duplicarAct('+a.id+')">Dup.</button>'+
+        '<button class="btn peq peligro" onclick="eliminarAct('+a.id+')">Elim.</button>'+
+      '</div>'+
+      '<div class="tl">'+
+        (idxHoy>=0 ? '<div class="marca-hoy" style="left:calc(100%/60*'+idxHoy+');width:calc(100%/60)"></div>' : '')+
+        '<div class="barra" style="left:calc(100%/60*'+t.i0+');width:calc(100%/60*'+(t.i1-t.i0+1)+');background:'+hexA(col,.40)+'">'+
+          '<div class="relleno" style="width:'+av+'%;background:'+col+'"></div>'+
+          '<div class="etq">'+esc(a.nombre)+' · '+av+'%</div>'+
+        '</div>'+
+      '</div></div>';
+  }
+  document.getElementById("ganttArea").innerHTML = html;
+}
+
+/* ============================================================
+   ACCIONES SOBRE ACTIVIDADES
+   ============================================================ */
+function nuevoId(){ return actividades.reduce((m,a)=>Math.max(m,a.id),0)+1; }
+
+function guardarActividad(ev){
+  ev.preventDefault();
+  const fi = document.getElementById("fIni").value;
+  const ff = document.getElementById("fFin").value;
+  if(!fi){ alert("La fecha de inicio es obligatoria."); return false; }
+  if(ff && ff < fi){ alert("La fecha de término no puede ser anterior a la de inicio."); return false; }
+  const datos = {
+    nombre:      document.getElementById("fNombre").value.trim(),
+    descripcion: document.getElementById("fDesc").value.trim(),
+    responsable: document.getElementById("fResp").value.trim(),
+    fechaInicio: fi, fechaTermino: ff,
+    categoria:   document.getElementById("fCat").value,
+    prioridad:   document.getElementById("fPrio").value,
+    estado:      document.getElementById("fEstado").value,
+    avance:      Number(document.getElementById("fAvance").value)
+  };
+  if(!datos.nombre){ alert("El nombre de la actividad es obligatorio."); return false; }
+  if(editId!==null){
+    const a = actividades.find(x=>x.id===editId);
+    if(a) Object.assign(a,datos);
+    cancelarEdicion();
+  }else{
+    actividades.push(Object.assign({id:nuevoId()},datos));
+    document.getElementById("formAct").reset();
+    document.getElementById("avisoSemana").textContent="";
+  }
+  guardar(); renderTodo();
+  return false;
+}
+function editarAct(id){
+  const a = actividades.find(x=>x.id===id); if(!a) return;
+  editId = id;
+  document.getElementById("fNombre").value = a.nombre;
+  document.getElementById("fDesc").value   = a.descripcion||"";
+  document.getElementById("fResp").value   = a.responsable||"";
+  document.getElementById("fIni").value    = a.fechaInicio;
+  document.getElementById("fFin").value    = a.fechaTermino||"";
+  document.getElementById("fCat").value    = a.categoria;
+  document.getElementById("fPrio").value   = a.prioridad;
+  document.getElementById("fEstado").value = a.estado;
+  document.getElementById("fAvance").value = a.avance;
+  document.getElementById("tituloForm").textContent  = "Editando actividad #"+id;
+  document.getElementById("btnGuardarAct").textContent = "Guardar cambios";
+  document.getElementById("btnCancelar").style.display = "block";
+  previewSemana();
+  document.getElementById("sidebar").classList.add("abierto");
+  document.getElementById("fNombre").focus();
+}
+function cancelarEdicion(){
+  editId = null;
+  document.getElementById("formAct").reset();
+  document.getElementById("avisoSemana").textContent="";
+  document.getElementById("tituloForm").textContent  = "Gestión de Actividades";
+  document.getElementById("btnGuardarAct").textContent = "Agregar Actividad";
+  document.getElementById("btnCancelar").style.display = "none";
+}
+function duplicarAct(id){
+  const a = actividades.find(x=>x.id===id); if(!a) return;
+  const c = Object.assign({},a,{id:nuevoId(),nombre:a.nombre+" (copia)"});
+  actividades.push(c); guardar(); renderTodo();
+}
+function eliminarAct(id){
+  const a = actividades.find(x=>x.id===id); if(!a) return;
+  if(!confirm('¿Eliminar la actividad "'+a.nombre+'"? Esta acción no se puede deshacer.')) return;
+  actividades = actividades.filter(x=>x.id!==id);
+  if(editId===id) cancelarEdicion();
+  guardar(); renderTodo();
+}
+function cambiarAvance(id,v){
+  const a = actividades.find(x=>x.id===id); if(!a) return;
+  a.avance = Number(v);
+  if(a.avance===100 && a.estado!=="Finalizada" && confirm("El avance llegó a 100%. ¿Marcar la actividad como Finalizada?")) a.estado="Finalizada";
+  guardar(); renderTodo();
+}
+
+/* Vista previa de la semana calculada al elegir fechas en el formulario */
+function previewSemana(){
+  const fi = document.getElementById("fIni").value;
+  const ff = document.getElementById("fFin").value;
+  const el = document.getElementById("avisoSemana");
+  if(!fi){ el.textContent=""; return; }
+  const a = pf(fi);
+  let txt = "→ "+MESES[a.m-1]+" · SEMANA "+semanaDeDia(a.d);
+  if(ff){ const b = pf(ff); txt += "  hasta  "+MESES[b.m-1]+" · SEMANA "+semanaDeDia(b.d); }
+  el.textContent = txt;
+}
+
+/* ============================================================
+   CONFIGURACIÓN GENERAL
+   ============================================================ */
+function cargarConfigEnFormulario(){
+  document.getElementById("cfgUnidad").value = config.unidad||"";
+  document.getElementById("cfgDepto").value  = config.depto||"";
+  document.getElementById("cfgResp").value   = config.responsable||"";
+  document.getElementById("cfgAnio").value   = config.anio;
+}
+function guardarConfig(){
+  config.unidad      = document.getElementById("cfgUnidad").value.trim();
+  config.depto       = document.getElementById("cfgDepto").value.trim();
+  config.responsable = document.getElementById("cfgResp").value.trim();
+  const a = Number(document.getElementById("cfgAnio").value);
+  if(a>=2000 && a<=2100) config.anio = a;
+  guardar(); renderTodo();
+}
+
+/* ============================================================
+   MÓDULO REVISAR ACTIVIDADES
+   ============================================================ */
+function abrirRevisar(mes,sem){
+  revisar.mes = mes; revisar.semanas = [sem];
+  cambiarTab("revisar");
+}
+function cambiarMesRevisar(){
+  revisar.mes = Number(document.getElementById("revMes").value);
+  renderRevisar();
+}
+function toggleSemana(s){
+  const i = revisar.semanas.indexOf(s);
+  if(i>=0) revisar.semanas.splice(i,1); else revisar.semanas.push(s);
+  revisar.semanas.sort();
+  renderRevisar();
+}
+function revTodoElMes(){ revisar.semanas=[1,2,3,4,5]; renderRevisar(); }
+function revSemanaActual(){
+  const h = new Date();
+  revisar.mes = h.getMonth()+1;
+  revisar.semanas = [semanaDeDia(h.getDate())];
+  renderRevisar();
+}
+
+function renderRevisar(){
+  const anio = config.anio;
+  /* Controles */
+  document.getElementById("revMes").innerHTML =
+    MESES.map((m,i)=>'<option value="'+(i+1)+'"'+((i+1)===revisar.mes?" selected":"")+'>'+m+'</option>').join("");
+  document.getElementById("revChips").innerHTML =
+    [1,2,3,4,5].map(s=>'<button type="button" class="chip'+(revisar.semanas.includes(s)?" on":"")+'" onclick="toggleSemana('+s+')">S'+s+'</button>').join("");
+
+  /* Bloques por semana seleccionada */
+  const cont = document.getElementById("revResultado");
+  if(!revisar.semanas.length){
+    cont.innerHTML = '<div class="vacio">Seleccione al menos una semana para revisar.</div>'; return;
+  }
+  const hoy = hoyCero();
+  let html = "";
+  for(const s of revisar.semanas){
+    const rg = rangoSemana(anio, revisar.mes, s);
+    const titulo = "SEMANA "+s+(rg ? " · "+rg.ini+" al "+rg.fin+" de "+MESES_M[revisar.mes-1]+" de "+anio : "");
+    html += '<div class="bloque-sem"><h4>'+titulo+'</h4><div class="bloque-cuerpo">';
+    if(!rg){
+      html += '<div class="sin-act">Esta semana no existe en '+MESES_M[revisar.mes-1]+' (el mes termina antes del día 29).</div>';
+    }else{
+      const iSem = idxSemana(revisar.mes, s);
+      const enSemana = actsAnio()
+        .filter(a=>{ const t=tramo(a); return t.i0<=iSem && t.i1>=iSem; })
+        .sort((a,b)=>a.fechaInicio.localeCompare(b.fechaInicio));
+      if(!enSemana.length){
+        html += '<div class="sin-act">Sin actividades programadas.</div>';
+      }
+      for(const a of enSemana){
+        const col = colorDe(a), al = alertaDe(a);
+        const fin = a.fechaTermino || a.fechaInicio;
+        const rest = Math.round((aDate(fin)-hoy)/86400000);
+        const restTxt = a.estado==="Finalizada" ? "" :
+          (rest<0 ? Math.abs(rest)+" día(s) de atraso" : rest===0 ? "vence hoy" : "quedan "+rest+" día(s)");
+        html += '<div class="ficha" style="border-left-color:'+col+'">'+
+          '<div class="cuando"><div class="dia">'+DIAS[aDate(a.fechaInicio).getDay()]+'</div>'+
+            '<div class="fch">'+fmtLarga(a.fechaInicio)+'</div>'+
+            (a.fechaTermino && a.fechaTermino!==a.fechaInicio ? '<div class="fch">hasta '+fmtLarga(a.fechaTermino)+'</div>' : "")+
+          '</div>'+
+          '<div class="que"><div class="tit">'+esc(a.nombre)+'</div>'+
+            (a.descripcion?'<div class="des">'+esc(a.descripcion)+'</div>':"")+
+            '<div class="des">Responsable: '+esc(a.responsable||"—")+' · Prioridad '+a.prioridad+
+            (restTxt?' · '+restTxt:"")+'</div>'+
+          '</div>'+
+          '<div class="meta">'+
+            '<span style="display:flex;align-items:center;gap:6px"><span class="cuadro" style="background:'+col+'"></span>'+esc(a.categoria)+'</span>'+
+            '<span class="badge b-'+a.estado.replace(/\s/g,"")+'">'+a.estado+' · '+a.avance+'%</span>'+
+            (al?'<span class="alerta a-'+al+'"><span class="pto"></span>'+TXT_ALERTA[al]+'</span>':"")+
+            '<span class="acciones">'+
+              '<button class="btn sec peq" onclick="editarAct('+a.id+')">Editar</button>'+
+              '<button class="btn peq peligro" onclick="eliminarAct('+a.id+')">Elim.</button>'+
+            '</span>'+
+          '</div></div>';
+      }
+    }
+    html += '</div></div>';
+  }
+  cont.innerHTML = html;
+}
+
+/* ============================================================
+   RESUMEN EJECUTIVO Y GRÁFICOS
+   ============================================================ */
+function renderResumen(){
+  const L = actsAnio();
+  const cuenta = (fn)=>{ const m={}; L.forEach(a=>{ const k=fn(a)||"—"; m[k]=(m[k]||0)+1; }); return m; };
+  const porEstado = cuenta(a=>a.estado);
+  const porCat    = cuenta(a=>a.categoria);
+  const porResp   = cuenta(a=>a.responsable);
+  const porMes    = {}; L.forEach(a=>{ const m=pf(a.fechaInicio).m; const k=MESES[m-1]; porMes[k]=(porMes[k]||0)+1; });
+  const avg = L.length ? Math.round(L.reduce((s,a)=>s+Number(a.avance||0),0)/L.length) : 0;
+
+  /* Tablas resumen */
+  const tabla = (titulo,obj)=>'<div class="grafico-card"><h4>'+titulo+'</h4><table class="mini-tabla">'+
+    Object.entries(obj).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v+'</td></tr>').join("")+'</table></div>';
+  document.getElementById("resTablas").innerHTML =
+    tabla("Por Responsable",porResp)+tabla("Por Categoría",porCat)+tabla("Por Mes (inicio)",porMes);
+
+  /* Gráficos Chart.js con la paleta ejecutiva */
+  if(typeof Chart==="undefined") return;
+  const textoCss = getComputedStyle(document.body).getPropertyValue("--texto").trim();
+  Chart.defaults.font.family = '"Times New Roman",Times,serif';
+  Chart.defaults.color = textoCss;
+  const destruir = id => { if(charts[id]){ charts[id].destroy(); delete charts[id]; } };
+  const PALETA = Object.values(CATEGORIAS);
+
+  destruir("chEstado");
+  charts.chEstado = new Chart(document.getElementById("chEstado"),{
+    type:"bar",
+    data:{ labels:Object.keys(porEstado),
+      datasets:[{ data:Object.values(porEstado),
+        backgroundColor:Object.keys(porEstado).map(e=>({Pendiente:"#64748b","En Ejecución":"#1e3a5f",Finalizada:"#166534",Suspendida:"#9aa4b1"}[e]||"#64748b")) }]},
+    options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
+  });
+  destruir("chCategoria");
+  charts.chCategoria = new Chart(document.getElementById("chCategoria"),{
+    type:"doughnut",
+    data:{ labels:Object.keys(porCat),
+      datasets:[{ data:Object.values(porCat), backgroundColor:Object.keys(porCat).map(c=>CATEGORIAS[c]||"#64748b") }]},
+    options:{ plugins:{legend:{position:"right",labels:{boxWidth:11,font:{size:10}}}} }
+  });
+  destruir("chResponsable");
+  charts.chResponsable = new Chart(document.getElementById("chResponsable"),{
+    type:"bar",
+    data:{ labels:Object.keys(porResp),
+      datasets:[{ data:Object.values(porResp), backgroundColor:Object.keys(porResp).map((_,i)=>PALETA[i%PALETA.length]) }]},
+    options:{ indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
+  });
+  destruir("chAvance");
+  charts.chAvance = new Chart(document.getElementById("chAvance"),{
+    type:"doughnut",
+    data:{ labels:["Avance","Restante"],
+      datasets:[{ data:[avg,100-avg], backgroundColor:["#1e3a5f","#d8dce3"] }]},
+    options:{ plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.label+": "+c.parsed+"%"}},
+      title:{display:true,text:avg+"% de avance general",position:"bottom",font:{size:13}}} }
+  });
+}
+
+/* ============================================================
+   EXPORTACIONES
+   ============================================================ */
+function exportarExcel(){
+  if(typeof XLSX==="undefined"){ alert("No se pudo cargar la librería de Excel (requiere conexión a internet)."); return; }
+  const filas = actsFiltradas().map(a=>({
+    "ID":a.id, "Actividad":a.nombre, "Descripción":a.descripcion||"",
+    "Responsable":a.responsable||"", "Categoría":a.categoria,
+    "Fecha Inicio":a.fechaInicio, "Semana Inicio":etiquetaSemana(a.fechaInicio),
+    "Fecha Término":a.fechaTermino||"", "Semana Término":a.fechaTermino?etiquetaSemana(a.fechaTermino):"",
+    "Prioridad":a.prioridad, "Estado":a.estado, "% Avance":a.avance,
+    "Situación":a.estado==="Finalizada"?"Finalizada":TXT_ALERTA[alertaDe(a)]
+  }));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Carta Gantt "+config.anio);
+  XLSX.writeFile(wb,"carta_gantt_"+config.anio+".xlsx");
+}
+
+function exportarPDF(){
+  if(typeof html2canvas==="undefined" || typeof window.jspdf==="undefined"){
+    alert("No se pudieron cargar las librerías de PDF (requieren conexión a internet)."); return;
+  }
+  const area = document.getElementById("ganttArea");
+  const fondo = getComputedStyle(document.body).getPropertyValue("--panel").trim();
+  /* Se captura el contenido completo del Gantt, incluyendo lo que está fuera del scroll */
+  html2canvas(area,{scale:1.5,backgroundColor:fondo,width:area.scrollWidth,height:area.scrollHeight,
+                    windowWidth:area.scrollWidth}).then(canvas=>{
+    const pdf = new window.jspdf.jsPDF("l","mm","a4");
+    const aw = pdf.internal.pageSize.getWidth()-16, ah = pdf.internal.pageSize.getHeight()-26;
+    let w = aw, h = canvas.height*aw/canvas.width;
+    if(h>ah){ h = ah; w = canvas.width*ah/canvas.height; }
+    pdf.setFont("times","bold"); pdf.setFontSize(12);
+    pdf.text("CARTA GANTT DE PLANIFICACIÓN Y CONTROL DE ACTIVIDADES — "+config.anio,8,10);
+    pdf.setFont("times","normal"); pdf.setFontSize(9);
+    pdf.text((config.unidad||"")+"  ·  "+(config.depto||"")+"  ·  Responsable: "+(config.responsable||""),8,15);
+    pdf.addImage(canvas.toDataURL("image/png"),"PNG",8,19,w,h);
+    pdf.save("carta_gantt_"+config.anio+".pdf");
+  }).catch(()=>alert("No fue posible generar el PDF."));
+}
+
+/* ============================================================
+   PESTAÑAS, TEMA Y MENÚ MÓVIL
+   ============================================================ */
+function cambiarTab(id){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.tab===id));
+  document.querySelectorAll(".seccion").forEach(s=>s.classList.toggle("on",s.id==="sec-"+id));
+  if(id==="resumen") renderResumen();
+  if(id==="revisar") renderRevisar();
+}
+function alternarTema(){
+  const html = document.documentElement;
+  const nuevo = html.dataset.theme==="oscuro" ? "claro" : "oscuro";
+  html.dataset.theme = nuevo;
+  localStorage.setItem(LS.tema,nuevo);
+  document.getElementById("btnTema").textContent = nuevo==="oscuro" ? "Modo claro" : "Modo oscuro";
+  if(document.getElementById("sec-resumen").classList.contains("on")) renderResumen();
+}
+function alternarMenu(){ document.getElementById("sidebar").classList.toggle("abierto"); }
+
+/* ============================================================
+   INICIALIZACIÓN
+   ============================================================ */
+(function init(){
+  /* Tema guardado */
+  const tema = localStorage.getItem(LS.tema);
+  if(tema==="oscuro"){ document.documentElement.dataset.theme="oscuro";
+    document.getElementById("btnTema").textContent="Modo claro"; }
+
+  /* Selects estáticos del formulario y leyenda */
+  document.getElementById("fCat").innerHTML =
+    Object.keys(CATEGORIAS).map(c=>'<option>'+c+'</option>').join("");
+  document.getElementById("fAvance").innerHTML =
+    [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'">'+v+'%</option>').join("");
+  document.getElementById("leyenda").innerHTML =
+    Object.entries(CATEGORIAS).map(([c,col])=>'<div><span class="cuadro" style="background:'+col+'"></span>'+c+'</div>').join("")+
+    '<div><span class="cuadro" style="background:'+COLOR_FINALIZADA+'"></span>Finalizada (cualquier categoría)</div>';
+
+  cargar();
+
+  /* Revisar parte en la semana actual */
+  const h = new Date();
+  revisar.mes = h.getMonth()+1;
+  revisar.semanas = [semanaDeDia(h.getDate())];
+
+  renderTodo();
+})();
+</script>
+</body>
+</html>
