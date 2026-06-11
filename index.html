@@ -555,6 +555,20 @@ function alertaDe(a){
 }
 const TXT_ALERTA = { vencida:"Vencida", porvencer:"Por vencer", aldia:"Al día" };
 
+/* % de avance vigente de una actividad.
+   - Finalizada → 100.
+   - Modo "auto": avanza solo con los días transcurridos entre inicio y término.
+   - Modo "manual": valor fijado por el usuario (p. ej. actividad detenida). */
+function avanceDe(a){
+  if(a.estado==="Finalizada") return 100;
+  if(a.modoAvance!=="auto") return Number(a.avance||0);
+  const ini = aDate(a.fechaInicio), fin = aDate(a.fechaTermino||a.fechaInicio), hoy = hoyCero();
+  if(hoy < ini) return 0;
+  const total = (fin-ini)/86400000 + 1;
+  const trans = (hoy-ini)/86400000 + 1;
+  return Math.min(100, Math.max(0, Math.round(trans/total*100)));
+}
+
 /* ============================================================
    PERSISTENCIA (LocalStorage + respaldo JSON)
    ============================================================ */
@@ -570,6 +584,8 @@ function cargar(){
     actividades = JSON.parse(localStorage.getItem(LS.act))  || [];
     filtros     = Object.assign(filtros, JSON.parse(localStorage.getItem(LS.fil)) || {});
   }catch(e){ config=null; actividades=[]; }
+  /* Migración: actividades guardadas antes del avance automático pasan a modo auto */
+  actividades.forEach(a=>{ if(a.modoAvance===undefined) a.modoAvance="auto"; });
   if(!config) iniciarDatosEjemplo();
 }
 function exportarJSON(){
@@ -610,7 +626,7 @@ function iniciarDatosEjemplo(){
   const d = (m,dd)=> Y+"-"+String(m).padStart(2,"0")+"-"+String(dd).padStart(2,"0");
   let n = 0;
   const A = (nombre,desc,resp,fi,ff,cat,prio,est,av)=>({id:++n,nombre,descripcion:desc,responsable:resp,
-    fechaInicio:fi,fechaTermino:ff,categoria:cat,prioridad:prio,estado:est,avance:av});
+    fechaInicio:fi,fechaTermino:ff,categoria:cat,prioridad:prio,estado:est,avance:av,modoAvance:"auto"});
   actividades = [
     A("Planificación anual de la unidad","Formulación del plan anual de actividades y metas.","J. Soto",d(1,5),d(1,16),"Actividad Unidad","Alta","Finalizada",100),
     A("Reunión de coordinación mensual","Revisión de avances con jefaturas de área.","M. Pérez",d(2,9),"","Reunión","Media","Finalizada",100),
@@ -623,6 +639,7 @@ function iniciarDatosEjemplo(){
     A("Capacitación segundo semestre","Programa de capacitación interna.","C. Rojas",d(8,17),d(8,28),"Capacitación","Baja","Pendiente",0),
     A("Auditoría segundo semestre","Auditoría de cierre de gestión.","J. Soto",d(10,12),d(10,30),"Auditoría","Alta","Pendiente",0)
   ];
+  actividades[5].modoAvance = "manual";   // matriz de riesgos: detenida en 60% (ejemplo de avance manual)
   guardar();
 }
 
@@ -694,7 +711,7 @@ function renderKPIs(){
   const cnt = e => L.filter(a=>a.estado===e).length;
   const venc = L.filter(a=>alertaDe(a)==="vencida").length;
   const prox = L.filter(a=>alertaDe(a)==="porvencer").length;
-  const avg  = L.length ? Math.round(L.reduce((s,a)=>s+Number(a.avance||0),0)/L.length) : 0;
+  const avg  = L.length ? Math.round(L.reduce((s,a)=>s+avanceDe(a),0)/L.length) : 0;
   const tarjetas = [
     ["Total Actividades", L.length, ""],
     ["Pendientes",        cnt("Pendiente"), ""],
@@ -774,9 +791,11 @@ function renderGantt(){
   }
   for(const a of L){
     const t = tramo(a), col = colorDe(a), al = alertaDe(a);
-    const av = Number(a.avance||0);
-    const selAv = '<select class="sel-avance" onchange="cambiarAvance('+a.id+',this.value)">'+
-      [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'"'+(v===av?" selected":"")+'>'+v+'%</option>').join("")+'</select>';
+    const av = avanceDe(a);
+    const esAuto = a.modoAvance==="auto";
+    const selAv = '<select class="sel-avance" onchange="cambiarAvance('+a.id+',this.value)" title="'+(esAuto?"Avance automático según fechas":"Avance manual (fijado por usted)")+'">'+
+      '<option value="auto"'+(esAuto?" selected":"")+'>A·'+av+'%</option>'+
+      [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'"'+(!esAuto&&v===Number(a.avance||0)?" selected":"")+'>'+v+'%</option>').join("")+'</select>';
     const alertaHTML = al ? '<span class="alerta a-'+al+'"><span class="pto"></span>'+TXT_ALERTA[al]+'</span>' : "";
     const fIni = pf(a.fechaInicio), fFin = pf(a.fechaTermino||a.fechaInicio);
     html += '<div class="grow gfila">'+
@@ -823,9 +842,15 @@ function guardarActividad(ev){
     fechaInicio: fi, fechaTermino: ff,
     categoria:   document.getElementById("fCat").value,
     prioridad:   document.getElementById("fPrio").value,
-    estado:      document.getElementById("fEstado").value,
-    avance:      Number(document.getElementById("fAvance").value)
+    estado:      document.getElementById("fEstado").value
   };
+  const avSel = document.getElementById("fAvance").value;
+  datos.modoAvance = (avSel==="auto") ? "auto" : "manual";
+  datos.avance     = (avSel==="auto") ? avanceDe(datos) : Number(avSel);
+  /* Si la actividad queda Suspendida, el avance automático se congela en su valor actual */
+  if(datos.estado==="Suspendida" && datos.modoAvance==="auto"){
+    datos.modoAvance = "manual";
+  }
   if(!datos.nombre){ alert("El nombre de la actividad es obligatorio."); return false; }
   if(editId!==null){
     const a = actividades.find(x=>x.id===editId);
@@ -851,7 +876,7 @@ function editarAct(id){
   document.getElementById("fCat").value    = a.categoria;
   document.getElementById("fPrio").value   = a.prioridad;
   document.getElementById("fEstado").value = a.estado;
-  document.getElementById("fAvance").value = a.avance;
+  document.getElementById("fAvance").value = (a.modoAvance==="auto") ? "auto" : String(a.avance);
   document.getElementById("tituloForm").textContent  = "Editando actividad #"+id;
   document.getElementById("btnGuardarAct").textContent = "Guardar cambios";
   previewSemana();
@@ -879,8 +904,13 @@ function eliminarAct(id){
 }
 function cambiarAvance(id,v){
   const a = actividades.find(x=>x.id===id); if(!a) return;
-  a.avance = Number(v);
-  if(a.avance===100 && a.estado!=="Finalizada" && confirm("El avance llegó a 100%. ¿Marcar la actividad como Finalizada?")) a.estado="Finalizada";
+  if(v==="auto"){
+    a.modoAvance = "auto";
+  }else{
+    a.modoAvance = "manual";
+    a.avance = Number(v);
+    if(a.avance===100 && a.estado!=="Finalizada" && confirm("El avance llegó a 100%. ¿Marcar la actividad como Finalizada?")) a.estado="Finalizada";
+  }
   guardar(); renderTodo();
 }
 
@@ -986,7 +1016,7 @@ function renderRevisar(){
           '</div>'+
           '<div class="meta">'+
             '<span style="display:flex;align-items:center;gap:6px"><span class="cuadro" style="background:'+col+'"></span>'+esc(a.categoria)+'</span>'+
-            '<span class="badge b-'+a.estado.replace(/\s/g,"")+'">'+a.estado+' · '+a.avance+'%</span>'+
+            '<span class="badge b-'+a.estado.replace(/\s/g,"")+'">'+a.estado+' · '+avanceDe(a)+'%'+(a.modoAvance==="auto"?" (auto)":"")+'</span>'+
             (al?'<span class="alerta a-'+al+'"><span class="pto"></span>'+TXT_ALERTA[al]+'</span>':"")+
             '<span class="acciones">'+
               '<button class="btn sec peq" onclick="editarAct('+a.id+')">Editar</button>'+
@@ -1010,7 +1040,7 @@ function renderResumen(){
   const porCat    = cuenta(a=>a.categoria);
   const porResp   = cuenta(a=>a.responsable);
   const porMes    = {}; L.forEach(a=>{ const m=pf(a.fechaInicio).m; const k=MESES[m-1]; porMes[k]=(porMes[k]||0)+1; });
-  const avg = L.length ? Math.round(L.reduce((s,a)=>s+Number(a.avance||0),0)/L.length) : 0;
+  const avg = L.length ? Math.round(L.reduce((s,a)=>s+avanceDe(a),0)/L.length) : 0;
 
   /* Tablas resumen */
   const tabla = (titulo,obj)=>'<div class="grafico-card"><h4>'+titulo+'</h4><table class="mini-tabla">'+
@@ -1069,7 +1099,8 @@ function exportarExcel(){
     "Responsable":a.responsable||"", "Categoría":a.categoria,
     "Fecha Inicio":a.fechaInicio, "Semana Inicio":etiquetaSemana(a.fechaInicio),
     "Fecha Término":a.fechaTermino||"", "Semana Término":a.fechaTermino?etiquetaSemana(a.fechaTermino):"",
-    "Prioridad":a.prioridad, "Estado":a.estado, "% Avance":a.avance,
+    "Prioridad":a.prioridad, "Estado":a.estado,
+    "% Avance":avanceDe(a), "Modo Avance":(a.modoAvance==="auto"?"Automático":"Manual"),
     "Situación":a.estado==="Finalizada"?"Finalizada":TXT_ALERTA[alertaDe(a)]
   }));
   const ws = XLSX.utils.json_to_sheet(filas);
@@ -1146,7 +1177,8 @@ function cerrarModalConfig(){ document.getElementById("modalCfg").classList.remo
   document.getElementById("fCat").innerHTML =
     Object.keys(CATEGORIAS).map(c=>'<option>'+c+'</option>').join("");
   document.getElementById("fAvance").innerHTML =
-    [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'">'+v+'%</option>').join("");
+    '<option value="auto">Automático (avanza según fechas)</option>'+
+    [0,10,20,30,40,50,60,70,80,90,100].map(v=>'<option value="'+v+'">'+v+'% (manual)</option>').join("");
   document.getElementById("leyenda").innerHTML =
     Object.entries(CATEGORIAS).map(([c,col])=>'<div><span class="cuadro" style="background:'+col+'"></span>'+c+'</div>').join("")+
     '<div><span class="cuadro" style="background:'+COLOR_FINALIZADA+'"></span>Finalizada (cualquier categoría)</div>';
