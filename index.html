@@ -845,7 +845,7 @@ function renderGantt(){
 
   /* Encabezado: columnas fijas + línea de tiempo (meses / semanas) */
   let html = '<div class="grow ghead">'+
-    '<div class="ord" onclick="ordenarPor(\'id\')">ID'+flecha("id")+'</div>'+
+    '<div title="Número correlativo según el orden actual">N°</div>'+
     '<div class="ord" onclick="ordenarPor(\'nombre\')">Actividad'+flecha("nombre")+'</div>'+
     '<div>Responsable</div><div>Categoría</div>'+
     '<div class="ord" onclick="ordenarPor(\'fechaInicio\')">Inicio'+flecha("fechaInicio")+'</div>'+
@@ -865,6 +865,7 @@ function renderGantt(){
   if(!L.length){
     html += '<div class="vacio">No hay actividades que coincidan con los filtros para el año '+anio+'.</div>';
   }
+  let correlativo = 0;   // N° visible: siempre 1, 2, 3… según el orden actual de la tabla
   for(const a of L){
     const t = tramo(a), col = colorDe(a), al = alertaDe(a);
     const av = avanceDe(a);
@@ -875,7 +876,7 @@ function renderGantt(){
     const alertaHTML = al ? '<span class="alerta a-'+al+'"><span class="pto"></span>'+TXT_ALERTA[al]+'</span>' : "";
     const fIni = pf(a.fechaInicio), fFin = pf(a.fechaTermino||a.fechaInicio);
     html += '<div class="grow gfila">'+
-      '<div>'+a.id+'</div>'+
+      '<div>'+(++correlativo)+'</div>'+
       '<div class="nom"><span title="'+esc(a.nombre)+(a.descripcion?" — "+esc(a.descripcion):"")+'">'+esc(a.nombre)+'</span></div>'+
       '<div>'+esc(a.responsable||"—")+'</div>'+
       '<div class="celda-cat"><span class="cuadro" style="background:'+col+'"></span>'+esc(a.categoria)+'</div>'+
@@ -955,7 +956,7 @@ function editarAct(id){
   document.getElementById("fPrio").value   = a.prioridad;
   document.getElementById("fEstado").value = a.estado;
   document.getElementById("fAvance").value = (a.modoAvance==="auto") ? "auto" : String(a.avance);
-  document.getElementById("tituloForm").textContent  = "Editando actividad #"+id;
+  document.getElementById("tituloForm").textContent  = "Editando: "+(a.nombre.length>46 ? a.nombre.slice(0,46)+"…" : a.nombre);
   document.getElementById("btnGuardarAct").textContent = "Guardar cambios";
   previewSemana();
   document.getElementById("modalAct").classList.add("on");
@@ -1172,8 +1173,8 @@ function renderResumen(){
    ============================================================ */
 function exportarExcel(){
   if(typeof XLSX==="undefined"){ alert("No se pudo cargar la librería de Excel (requiere conexión a internet)."); return; }
-  const filas = actsFiltradas().map(a=>({
-    "ID":a.id, "Actividad":a.nombre, "Descripción":a.descripcion||"",
+  const filas = actsFiltradas().map((a,i)=>({
+    "N°":i+1, "Actividad":a.nombre, "Descripción":a.descripcion||"",
     "Responsable":a.responsable||"", "Categoría":a.categoria,
     "Fecha Inicio":a.fechaInicio, "Semana Inicio":etiquetaSemana(a.fechaInicio),
     "Fecha Término":a.fechaTermino||"", "Semana Término":a.fechaTermino?etiquetaSemana(a.fechaTermino):"",
