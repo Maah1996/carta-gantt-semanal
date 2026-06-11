@@ -111,9 +111,8 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 /* ============================================================
    DISPOSICIÓN GENERAL
    ============================================================ */
-.layout{display:flex;gap:14px;padding:12px 22px 26px;align-items:flex-start}
-.sidebar{width:268px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
-.content{flex:1;min-width:0}
+.layout{padding:12px 22px 26px}
+.content{width:100%}
 
 .card{
   background:var(--panel);border:1px solid var(--borde);border-radius:6px;
@@ -130,9 +129,9 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 .aviso-semana{font-size:12px;color:var(--azul);font-weight:bold;min-height:16px;margin:2px 0 6px}
 [data-theme="oscuro"] .aviso-semana{color:#9db8d8}
 
-/* Leyenda de categorías */
-.leyenda{display:flex;flex-direction:column;gap:5px}
-.leyenda div{display:flex;align-items:center;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+/* Leyenda de categorías (barra horizontal bajo el Gantt) */
+.leyenda-h{display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center;margin-top:10px;padding:9px 14px}
+.leyenda-h div{display:flex;align-items:center;gap:7px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
 .cuadro{width:12px;height:12px;border-radius:2px;flex-shrink:0}
 
 /* ============================================================
@@ -296,15 +295,41 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 .mini-tabla td:last-child{text-align:right;font-weight:bold}
 
 /* ============================================================
+   VENTANAS MODALES (formulario grande)
+   ============================================================ */
+.modal-fondo{
+  position:fixed;inset:0;background:rgba(15,23,42,.55);
+  display:none;align-items:flex-start;justify-content:center;
+  z-index:50;padding:34px 14px;overflow:auto;
+}
+.modal-fondo.on{display:flex}
+.modal{
+  background:var(--panel);border:1px solid var(--borde);border-radius:8px;
+  box-shadow:0 12px 44px rgba(0,0,0,.38);width:100%;max-width:780px;
+  padding:20px 26px 18px;
+}
+.modal h3{
+  font-size:14px;color:var(--azul);border-bottom:1px solid var(--borde);
+  padding-bottom:9px;margin-bottom:16px;
+}
+[data-theme="oscuro"] .modal h3{color:#9db8d8}
+.modal input,.modal select,.modal textarea{font-size:14.5px;padding:9px 10px}
+.modal .campo label{font-size:11.5px;margin-bottom:3px}
+.modal .aviso-semana{font-size:13.5px;min-height:20px;margin:4px 0 2px}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+.m-pie{
+  display:flex;justify-content:flex-end;gap:10px;margin-top:14px;
+  border-top:1px solid var(--borde);padding-top:14px;
+}
+.m-pie .btn{padding:9px 24px;font-size:14px}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
-.btn-menu{display:none}
 @media (max-width:980px){
-  .layout{flex-direction:column}
-  .sidebar{width:100%;display:none}
-  .sidebar.abierto{display:flex}
-  .btn-menu{display:inline-block}
   .gantt-scroll{max-height:none}
+  .m-grid{grid-template-columns:1fr}
+  .modal{padding:16px}
 }
 
 /* ============================================================
@@ -312,7 +337,7 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
    ============================================================ */
 @page{size:A4 landscape;margin:9mm}
 @media print{
-  .toolbar,.sidebar,.tabs,.filtros,.rev-controles,.acciones,.btn-menu,.sel-avance{display:none!important}
+  .toolbar,.tabs,.filtros,.rev-controles,.acciones,.sel-avance,.modal-fondo{display:none!important}
   body{background:#fff}
   .layout{padding:0}
   .gantt-scroll{max-height:none;overflow:visible;border:none;box-shadow:none}
@@ -332,9 +357,10 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 
 <!-- ============ BARRA DE HERRAMIENTAS ============ -->
 <div class="toolbar">
-  <button class="btn sec btn-menu" onclick="alternarMenu()">Panel</button>
-  <button class="btn" onclick="exportarPDF()">Exportar PDF</button>
-  <button class="btn" onclick="exportarExcel()">Exportar Excel</button>
+  <button class="btn" onclick="abrirNuevaActividad()">+ Ingresar Actividad</button>
+  <button class="btn sec" onclick="abrirModalConfig()">Configuración</button>
+  <button class="btn sec" onclick="exportarPDF()">Exportar PDF</button>
+  <button class="btn sec" onclick="exportarExcel()">Exportar Excel</button>
   <button class="btn sec" onclick="window.print()">Imprimir</button>
   <span class="sep"></span>
   <button class="btn sec" onclick="exportarJSON()">Exportar respaldo (JSON)</button>
@@ -347,53 +373,6 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 <section class="kpis" id="kpis"></section>
 
 <main class="layout">
-
-  <!-- ============ PANEL LATERAL ============ -->
-  <aside class="sidebar" id="sidebar">
-
-    <div class="card">
-      <h3>Datos Generales</h3>
-      <div class="campo"><label>Nombre de la Unidad</label><input id="cfgUnidad"></div>
-      <div class="campo"><label>Departamento</label><input id="cfgDepto"></div>
-      <div class="campo"><label>Responsable</label><input id="cfgResp"></div>
-      <div class="campo"><label>Año</label><input id="cfgAnio" type="number" min="2000" max="2100"></div>
-      <button class="btn" style="width:100%" onclick="guardarConfig()">Guardar Configuración</button>
-    </div>
-
-    <div class="card">
-      <h3 id="tituloForm">Gestión de Actividades</h3>
-      <form id="formAct" onsubmit="return guardarActividad(event)">
-        <div class="campo"><label>Nombre Actividad *</label><input id="fNombre" required maxlength="120"></div>
-        <div class="campo"><label>Descripción</label><textarea id="fDesc" rows="2" maxlength="400"></textarea></div>
-        <div class="campo"><label>Responsable</label><input id="fResp" maxlength="60"></div>
-        <div class="fila2">
-          <div class="campo"><label>Fecha Inicio *</label><input id="fIni" type="date" required onchange="previewSemana()"></div>
-          <div class="campo"><label>Fecha Término</label><input id="fFin" type="date" onchange="previewSemana()"></div>
-        </div>
-        <div class="aviso-semana" id="avisoSemana"></div>
-        <div class="fila2">
-          <div class="campo"><label>Categoría</label><select id="fCat"></select></div>
-          <div class="campo"><label>Prioridad</label>
-            <select id="fPrio"><option>Alta</option><option selected>Media</option><option>Baja</option></select>
-          </div>
-        </div>
-        <div class="fila2">
-          <div class="campo"><label>Estado</label>
-            <select id="fEstado"><option>Pendiente</option><option>En Ejecución</option><option>Finalizada</option><option>Suspendida</option></select>
-          </div>
-          <div class="campo"><label>% Avance</label><select id="fAvance"></select></div>
-        </div>
-        <button class="btn" style="width:100%" type="submit" id="btnGuardarAct">Agregar Actividad</button>
-        <button class="btn sec" style="width:100%;margin-top:6px;display:none" type="button" id="btnCancelar" onclick="cancelarEdicion()">Cancelar edición</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <h3>Leyenda</h3>
-      <div class="leyenda" id="leyenda"></div>
-    </div>
-
-  </aside>
 
   <!-- ============ CONTENIDO PRINCIPAL ============ -->
   <section class="content">
@@ -418,6 +397,7 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
         <button class="btn sec" onclick="limpiarFiltros()">Limpiar</button>
       </div>
       <div class="gantt-scroll" id="ganttArea"></div>
+      <div class="card leyenda-h" id="leyenda"></div>
     </section>
 
     <!-- ——— PESTAÑA: REVISAR ACTIVIDADES ——— -->
@@ -449,6 +429,50 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 
   </section>
 </main>
+
+<!-- ============ MODAL: FORMULARIO GRANDE DE ACTIVIDAD ============ -->
+<div class="modal-fondo" id="modalAct" onclick="if(event.target===this)cerrarModalActividad()">
+  <div class="modal">
+    <h3 id="tituloForm">Nueva Actividad</h3>
+    <form id="formAct" onsubmit="return guardarActividad(event)">
+      <div class="m-grid">
+        <div class="campo" style="grid-column:1/-1"><label>Nombre Actividad *</label><input id="fNombre" required maxlength="120"></div>
+        <div class="campo" style="grid-column:1/-1"><label>Descripción</label><textarea id="fDesc" rows="3" maxlength="400"></textarea></div>
+        <div class="campo"><label>Responsable</label><input id="fResp" maxlength="60"></div>
+        <div class="campo"><label>Categoría</label><select id="fCat"></select></div>
+        <div class="campo"><label>Fecha Inicio *</label><input id="fIni" type="date" required onchange="previewSemana()"></div>
+        <div class="campo"><label>Fecha Término (opcional)</label><input id="fFin" type="date" onchange="previewSemana()"></div>
+        <div class="campo"><label>Prioridad</label>
+          <select id="fPrio"><option>Alta</option><option selected>Media</option><option>Baja</option></select>
+        </div>
+        <div class="campo"><label>Estado</label>
+          <select id="fEstado"><option>Pendiente</option><option>En Ejecución</option><option>Finalizada</option><option>Suspendida</option></select>
+        </div>
+        <div class="campo"><label>% Avance</label><select id="fAvance"></select></div>
+      </div>
+      <div class="aviso-semana" id="avisoSemana"></div>
+      <div class="m-pie">
+        <button class="btn sec" type="button" onclick="cerrarModalActividad()">Cancelar</button>
+        <button class="btn" type="submit" id="btnGuardarAct">Agregar Actividad</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ MODAL: DATOS GENERALES ============ -->
+<div class="modal-fondo" id="modalCfg" onclick="if(event.target===this)cerrarModalConfig()">
+  <div class="modal" style="max-width:520px">
+    <h3>Datos Generales</h3>
+    <div class="campo"><label>Nombre de la Unidad</label><input id="cfgUnidad"></div>
+    <div class="campo"><label>Departamento</label><input id="cfgDepto"></div>
+    <div class="campo"><label>Responsable</label><input id="cfgResp"></div>
+    <div class="campo"><label>Año</label><input id="cfgAnio" type="number" min="2000" max="2100"></div>
+    <div class="m-pie">
+      <button class="btn sec" type="button" onclick="cerrarModalConfig()">Cancelar</button>
+      <button class="btn" type="button" onclick="guardarConfig()">Guardar Configuración</button>
+    </div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -812,6 +836,7 @@ function guardarActividad(ev){
     document.getElementById("formAct").reset();
     document.getElementById("avisoSemana").textContent="";
   }
+  document.getElementById("modalAct").classList.remove("on");
   guardar(); renderTodo();
   return false;
 }
@@ -829,18 +854,16 @@ function editarAct(id){
   document.getElementById("fAvance").value = a.avance;
   document.getElementById("tituloForm").textContent  = "Editando actividad #"+id;
   document.getElementById("btnGuardarAct").textContent = "Guardar cambios";
-  document.getElementById("btnCancelar").style.display = "block";
   previewSemana();
-  document.getElementById("sidebar").classList.add("abierto");
+  document.getElementById("modalAct").classList.add("on");
   document.getElementById("fNombre").focus();
 }
 function cancelarEdicion(){
   editId = null;
   document.getElementById("formAct").reset();
   document.getElementById("avisoSemana").textContent="";
-  document.getElementById("tituloForm").textContent  = "Gestión de Actividades";
+  document.getElementById("tituloForm").textContent  = "Nueva Actividad";
   document.getElementById("btnGuardarAct").textContent = "Agregar Actividad";
-  document.getElementById("btnCancelar").style.display = "none";
 }
 function duplicarAct(id){
   const a = actividades.find(x=>x.id===id); if(!a) return;
@@ -888,7 +911,7 @@ function guardarConfig(){
   config.responsable = document.getElementById("cfgResp").value.trim();
   const a = Number(document.getElementById("cfgAnio").value);
   if(a>=2000 && a<=2100) config.anio = a;
-  guardar(); renderTodo();
+  guardar(); renderTodo(); cerrarModalConfig();
 }
 
 /* ============================================================
@@ -1094,7 +1117,21 @@ function alternarTema(){
   document.getElementById("btnTema").textContent = nuevo==="oscuro" ? "Modo claro" : "Modo oscuro";
   if(document.getElementById("sec-resumen").classList.contains("on")) renderResumen();
 }
-function alternarMenu(){ document.getElementById("sidebar").classList.toggle("abierto"); }
+/* Modales de actividad y configuración */
+function abrirNuevaActividad(){
+  cancelarEdicion();
+  document.getElementById("modalAct").classList.add("on");
+  document.getElementById("fNombre").focus();
+}
+function cerrarModalActividad(){
+  document.getElementById("modalAct").classList.remove("on");
+  cancelarEdicion();
+}
+function abrirModalConfig(){
+  cargarConfigEnFormulario();
+  document.getElementById("modalCfg").classList.add("on");
+}
+function cerrarModalConfig(){ document.getElementById("modalCfg").classList.remove("on"); }
 
 /* ============================================================
    INICIALIZACIÓN
@@ -1120,6 +1157,13 @@ function alternarMenu(){ document.getElementById("sidebar").classList.toggle("ab
   const h = new Date();
   revisar.mes = h.getMonth()+1;
   revisar.semanas = [semanaDeDia(h.getDate())];
+
+  /* Cerrar modales con la tecla Escape */
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Escape") return;
+    if(document.getElementById("modalAct").classList.contains("on")) cerrarModalActividad();
+    if(document.getElementById("modalCfg").classList.contains("on")) cerrarModalConfig();
+  });
 
   renderTodo();
 })();
