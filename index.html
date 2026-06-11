@@ -171,11 +171,14 @@ h1,h2,h3{text-transform:uppercase;letter-spacing:.06em}
 }
 .grow{
   display:grid;
-  grid-template-columns:40px 175px 100px 100px 86px 92px 92px 66px 116px minmax(1260px,1fr);
-  min-width:2130px;
+  grid-template-columns:40px 175px 100px 100px 86px 92px 48px 66px 116px minmax(1260px,1fr);
+  min-width:2090px;
   border-bottom:1px solid var(--borde);
   align-items:stretch;
 }
+.celda-dias{justify-content:center!important;font-weight:bold;font-size:13px}
+.celda-dias .cero{color:var(--vencida)}
+[data-theme="oscuro"] .celda-dias .cero{color:#d98a96}
 .grow>div{padding:4px 6px;font-size:12px;display:flex;align-items:center;border-right:1px solid var(--borde)}
 .ghead{position:sticky;top:0;z-index:5;background:var(--azul);color:#fff;border-bottom:2px solid var(--azul-osc)}
 .ghead>div{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid rgba(255,255,255,.18);padding:0 6px}
@@ -603,6 +606,12 @@ function alertaDe(a){
 }
 const TXT_ALERTA = { vencida:"Vencida", porvencer:"Por vencer", aldia:"Al día" };
 
+/* Días que faltan para cumplir la actividad (se descuenta cada día, mínimo 0) */
+function diasRestantes(a){
+  const fin = aDate(a.fechaTermino || a.fechaInicio);
+  return Math.max(0, Math.round((fin - hoyCero())/86400000));
+}
+
 /* % de avance vigente de una actividad.
    - Finalizada → 100 (el 100% queda reservado para actividades terminadas).
    - Modo "auto": avanza solo con los días transcurridos entre inicio y término,
@@ -840,7 +849,7 @@ function renderGantt(){
     '<div class="ord" onclick="ordenarPor(\'nombre\')">Actividad'+flecha("nombre")+'</div>'+
     '<div>Responsable</div><div>Categoría</div>'+
     '<div class="ord" onclick="ordenarPor(\'fechaInicio\')">Inicio'+flecha("fechaInicio")+'</div>'+
-    '<div>Término</div><div>Estado</div>'+
+    '<div>Término</div><div title="Días que faltan para cumplir la actividad">Días</div>'+
     '<div class="ord" onclick="ordenarPor(\'avance\')">Avance'+flecha("avance")+'</div>'+
     '<div>Acciones</div>'+
     '<div class="tl-head"><div class="tl-meses">'+
@@ -873,7 +882,9 @@ function renderGantt(){
       '<div><div>'+fmtCorta(a.fechaInicio)+'<span class="sub">'+etiquetaSemana(a.fechaInicio)+'</span></div></div>'+
       '<div><div>'+(a.fechaTermino?fmtCorta(a.fechaTermino):"—")+
         '<span class="sub">'+(a.fechaTermino?etiquetaSemana(a.fechaTermino):"un día")+'</span>'+alertaHTML+'</div></div>'+
-      '<div><span class="badge b-'+a.estado.replace(/\s/g,"")+'">'+a.estado+'</span></div>'+
+      '<div class="celda-dias" title="Días restantes — estado: '+a.estado+'">'+
+        (a.estado==="Finalizada" ? '<span style="color:var(--texto-suave);font-weight:normal">—</span>'
+          : (al==="vencida" ? '<span class="cero">0</span>' : diasRestantes(a)))+'</div>'+
       '<div>'+selAv+'</div>'+
       '<div class="acciones">'+
         '<button class="btn sec peq" onclick="editarAct('+a.id+')">Editar</button>'+
@@ -1167,6 +1178,7 @@ function exportarExcel(){
     "Fecha Inicio":a.fechaInicio, "Semana Inicio":etiquetaSemana(a.fechaInicio),
     "Fecha Término":a.fechaTermino||"", "Semana Término":a.fechaTermino?etiquetaSemana(a.fechaTermino):"",
     "Prioridad":a.prioridad, "Estado":a.estado,
+    "Días Restantes":(a.estado==="Finalizada"?"":diasRestantes(a)),
     "% Avance":avanceDe(a), "Modo Avance":(a.modoAvance==="auto"?"Automático":"Manual"),
     "Situación":a.estado==="Finalizada"?"Finalizada":TXT_ALERTA[alertaDe(a)]
   }));
